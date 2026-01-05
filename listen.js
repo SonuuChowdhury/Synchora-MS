@@ -1,5 +1,6 @@
 import { WebSocketServer } from "ws";
 import { spawn } from "child_process";
+import detectIntent from "./src/tasks/detect.intent.js";
 
 const SAMPLE_RATE = 16000;
 const BYTES_PER_SEC = SAMPLE_RATE * 2;
@@ -82,6 +83,14 @@ export default function listen(server) {
   });
 }
 
+function DetectIntentOfText(text){
+  try{
+    detectIntent(text);
+  }catch(err){
+    console.error("Error in starting the intent detection process:", err);
+  }
+}
+
 function runSTT(pcmBuffer, socket) {
   const py = spawn("python", ["src/stt/stt.py"], {
     stdio: ["pipe", "pipe", "pipe"]
@@ -116,7 +125,7 @@ function runSTT(pcmBuffer, socket) {
       const result = JSON.parse(output);
       if (result.success) {
         console.log("🗣 COMMAND:", result.text);
-        
+        DetectIntentOfText(result.text)
       } else {
         console.log("❌ " + result.error);
       }
