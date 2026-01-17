@@ -5,7 +5,7 @@ import cors from "cors";
 import morgan from "morgan";
 
 import { errorHandler } from "./src/middlewares/error.middleware.js";
-import listen from "./listen.js";
+import {listen} from "./listen.js";
 import router from "./src/routes/routes.js";
 import connectDB from "./src/db/mongoose.connect.db.js";
 

@@ -1,8 +1,6 @@
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema({
-  user_id: { type: String, required: true, unique: true, index: true },
-
   preferred_tone: { type: String, enum: ["formal","casual","friendly","direct","motivational"], default: "friendly" },
   response_length: { type: String, enum: ["short","medium","detailed"], default: "medium" },
   language_style: { type: String, default: "simple" },
@@ -13,6 +11,7 @@ const userSchema = new mongoose.Schema({
   current_focus: { type: String, default: null },
   long_term_goals: { type: [String], default: [] },
   short_term_tasks: { type: [String], default: [] },
+  notes: { type: [String], default: [] },
 
   likes: { type: [String], default: [] },
   dislikes: { type: [String], default: [] },

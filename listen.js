@@ -1,6 +1,9 @@
 import { WebSocketServer } from "ws";
 import { spawn } from "child_process";
-import detectIntent from "./src/tasks/detect.intent.js";
+import detectIntent from "./src/assistant.tasks/detect.intent.app.js";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const SAMPLE_RATE = 16000;
 const BYTES_PER_SEC = SAMPLE_RATE * 2;
@@ -8,7 +11,7 @@ const MAX_SEC = 15;
 const MAX_BYTES = BYTES_PER_SEC * MAX_SEC;
 const MIN_BYTES = BYTES_PER_SEC * 0.3;
 
-export default function listen(server) {
+export function listen(server) {
   const wss = new WebSocketServer({ server });
 
   wss.on("connection", (socket) => {
@@ -59,6 +62,17 @@ export default function listen(server) {
             }, MAX_SEC * 1000);
           }
 
+          if (data.event === "TOKEN") {
+            if (!data.user_id || typeof data.user_id !== "string") {
+              console.warn("Invalid user_id token");
+              return;
+            }
+
+            socket.userId = data.user_id;
+            console.log("👤 User identified:", socket.userId);
+            return;
+          }
+
           if (data.event === "END") {
             endCommand("button_release");
           }
@@ -83,17 +97,33 @@ export default function listen(server) {
   });
 }
 
-function DetectIntentOfText(text){
-  try{
-    detectIntent(text);
-  }catch(err){
+async function DetectIntentOfText(text, userID, socket) {
+  try {
+    const result = await detectIntent(text, userID);
+    if(!result){
+      console.error("No result from App side.");
+    }
+    runTTS(result, socket);
+  } catch (err) {
     console.error("Error in starting the intent detection process:", err);
   }
 }
 
-function runSTT(pcmBuffer, socket) {
+function ValidateToken(userID){
+  //this will verify the request is only coming from the device only
+  if (!userID) {
+    return false;
+  }
+  const DeviceToken = process.env.DEVICE_ID;
+  if(!DeviceToken){
+    console.error("❌ DEVICE_ID not set in environment variables");
+  }
+  return userID == DeviceToken;
+}
+
+async function runSTT(pcmBuffer, socket) {
   const py = spawn("python", ["src/stt/stt.py"], {
-    stdio: ["pipe", "pipe", "pipe"]
+    stdio: ["pipe", "pipe", "pipe"],
   });
 
   let output = "";
@@ -123,9 +153,16 @@ function runSTT(pcmBuffer, socket) {
 
     try {
       const result = JSON.parse(output);
+      console.log("STT Result:", result);
       if (result.success) {
         console.log("🗣 COMMAND:", result.text);
-        DetectIntentOfText(result.text)
+        const valid = ValidateToken(socket.userId)
+        if (valid){
+          DetectIntentOfText(result.text, socket.userId, socket);
+        }else{
+          console.log("❌ Invalid or missing user token");
+          return;
+        }
       } else {
         console.log("❌ " + result.error);
       }
@@ -139,4 +176,27 @@ function runSTT(pcmBuffer, socket) {
     py.stdin.write(pcmBuffer);
     py.stdin.end();
   }
+}
+
+export function runTTS(text, socket) {
+  const py = spawn("python", ["src/tts/tts.py"], {
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+
+  py.stdin.write(text);
+  py.stdin.end();
+
+  py.stdout.on("data", (chunk) => {
+    // 🔴 Send raw PCM bytes to ESP32
+    socket.send(chunk, { binary: true });
+  });
+
+  py.stderr.on("data", (err) => {
+    console.error("TTS ERR:", err.toString());
+  });
+
+  py.on("close", () => {
+    // Optional end marker
+    socket.send(JSON.stringify({ event: "TTS_END" }));
+  });
 }

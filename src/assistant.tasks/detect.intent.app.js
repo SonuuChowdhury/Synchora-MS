@@ -2,6 +2,7 @@ import intentPrompt from "../prompts/detectIntent.prompt.js";
 import dotenv from "dotenv";
 import { RunnableSequence } from "@langchain/core/runnables";
 import GeminiInDetModel from "../config/geminiDetectionModel.config.js";
+import appHandler from "./app.handeller.js";
 
 dotenv.config();
 
@@ -17,7 +18,7 @@ function cleanJsonOutput(text) {
     .trim();
 }
 
-export default async function detectIntent(text) {
+export default async function detectIntent(text, userID) {
   if (!text || typeof text !== "string" || text.trim().length === 0) {
     return { intent: "no_text", confidence: 1.0 };
   }
@@ -33,7 +34,8 @@ export default async function detectIntent(text) {
     }
 
     console.log("🎯 Intent:", parsed.intent, "Confidence:", parsed.confidence);
-    return parsed;
+    const resultFromApp = await appHandler(text, parsed);
+    return resultFromApp;
 
   } catch (error) {
     console.error("Intent detection failed:", error.message);
