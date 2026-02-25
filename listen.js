@@ -15,7 +15,7 @@ export function listen(server) {
   const wss = new WebSocketServer({ server });
 
   wss.on("connection", (socket) => {
-    console.log("🎤 Mic connected");
+    console.log("USer connected via websocket protocol");
 
     let recording = false;
     let audioBuffer = Buffer.alloc(0);
@@ -99,6 +99,7 @@ export function listen(server) {
 
 async function DetectIntentOfText(text, userID, socket) {
   try {
+    //Here the detect intent function is internally handelling intent detection + command execution + storing agenitc memory and then returning the final text which should be converted to speech and sent back to the user device
     const result = await detectIntent(text, userID);
     if(!result){
       console.error("No result from App side.");
@@ -155,7 +156,6 @@ async function runSTT(pcmBuffer, socket) {
       const result = JSON.parse(output);
       console.log("STT Result:", result);
       if (result.success) {
-        console.log("🗣 COMMAND:", result.text);
         const valid = ValidateToken(socket.userId)
         if (valid){
           DetectIntentOfText(result.text, socket.userId, socket);
