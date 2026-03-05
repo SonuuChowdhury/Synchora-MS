@@ -6,7 +6,6 @@ import chatPrompt from "../prompts/chat.prompt.js";
 import SaveChat from "../db.tasks/chat.save.app.js";
 import GetUser from "../db.tasks/user.get.app.js";
 import SaveUser from "../db.tasks/user.save.app.js";
-import { runTTS } from "../../listen.js";
 
 import fs from "fs";
 import path from "path";
@@ -55,7 +54,6 @@ export default async function chatApp(text, intent){
         }
         await SaveChat(UserChatPayload)
         await SaveChat(parsedChat.chat);
-        console.log("📢 Synchora Reply:", parsedChat.chat.message);
         if(parsedChat.update_user){
             await SaveUser(parsedChat.user_update_data);
         }

@@ -7,7 +7,7 @@ dotenv.config();
 
 const SAMPLE_RATE = 16000;
 const BYTES_PER_SEC = SAMPLE_RATE * 2;
-const MAX_SEC = 15;
+const MAX_SEC = 30;
 const MAX_BYTES = BYTES_PER_SEC * MAX_SEC;
 const MIN_BYTES = BYTES_PER_SEC * 0.3;
 
@@ -104,7 +104,8 @@ async function DetectIntentOfText(text, userID, socket) {
     if(!result){
       console.error("No result from App side.");
     }
-    runTTS(result, socket);
+    console.log("Synchora Said:", result)
+    // runTTS(result, socket);
   } catch (err) {
     console.error("Error in starting the intent detection process:", err);
   }
@@ -155,7 +156,7 @@ async function runSTT(pcmBuffer, socket) {
     try {
       const result = JSON.parse(output);
       console.log("STT Result:", result);
-      if (result.success) {
+      if (result) {
         const valid = ValidateToken(socket.userId)
         if (valid){
           DetectIntentOfText(result.text, socket.userId, socket);
