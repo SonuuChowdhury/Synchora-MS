@@ -158,10 +158,10 @@ async function runSTT(pcmBuffer, socket) {
       console.log("STT Result:", result);
       if (result) {
         const valid = ValidateToken(socket.userId)
-        if (valid){
+        if (valid && result.success){
           DetectIntentOfText(result.text, socket.userId, socket);
         }else{
-          console.log("❌ Invalid or missing user token");
+          console.log("❌ Invalid command or missing user token");
           return;
         }
       } else {
