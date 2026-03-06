@@ -18,7 +18,7 @@ function cleanJsonOutput(text) {
     .trim();
 }
 
-export default async function detectIntent(text, userID) {
+export default async function detectIntent(text) {
   if (!text || typeof text !== "string" || text.trim().length === 0) {
     return { intent: "no_text", confidence: 1.0 };
   }
