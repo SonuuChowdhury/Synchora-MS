@@ -1,6 +1,7 @@
 import chatApp from "./chat.app.js";
 import financeAddApp from "./finance.add.app.js";
 import financeQueryApp from "./finance.query.app.js";
+import scheduleAddApp from "./schedule.add.app.js";
 
 export default async function appHandler(text, intent){
     if(!intent || !intent.intent){
@@ -12,6 +13,8 @@ export default async function appHandler(text, intent){
         return await financeAddApp(text, intent);
     }else if(intent.intent === "finance_query"){
         return await financeQueryApp(text, intent);
+    }else if(intent.intent === "schedule_add"){
+        return await scheduleAddApp(text, intent);
     }else if(intent.intent === "error"){
         return "I didn't catch that. Could you please say it again?";
     }else if(intent.intent === "no_text"){

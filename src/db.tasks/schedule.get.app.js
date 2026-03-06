@@ -1,12 +1,8 @@
 import ScheduleMemory from "../model/schedule.model.js";
 
-export default async function GetScheduleHistory(userId) {
+export default async function GetScheduleHistory() {
   try {
-    if (!userId) {
-      throw new Error("userId is required to fetch schedule history");
-    }
-
-    const history = await ScheduleMemory.find({ user_id: userId })
+    const history = await ScheduleMemory.find()
       .sort({ time: 1 })
       .lean();
 
