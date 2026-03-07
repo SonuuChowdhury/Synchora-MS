@@ -15,7 +15,7 @@ export function listen(server) {
   const wss = new WebSocketServer({ server });
 
   wss.on("connection", (socket) => {
-    console.log("USer connected via websocket protocol");
+    console.log("📌 User connected via synchora device(websocket protocol)");
 
     let recording = false;
     let audioBuffer = Buffer.alloc(0);
@@ -33,13 +33,13 @@ export function listen(server) {
       recording = false;
       if (timer) clearTimeout(timer);
 
-      console.log("🛑 Command ended:", reason);
-      console.log("📦 Audio bytes:", audioBuffer.length);
+      console.log("📌 Command ended:", reason);
+      console.log("📌 Audio bytes:", audioBuffer.length);
 
       if (audioBuffer.length >= MIN_BYTES) {
         runSTT(audioBuffer, socket);
       } else {
-        socket.send("⚠️ Command too short");
+        socket.send("📌 Command too short");
       }
 
       audioBuffer = Buffer.alloc(0);
@@ -50,12 +50,12 @@ export function listen(server) {
       if (!isBinary) {
         try {
           const data = JSON.parse(msg.toString());
-          console.log("CTRL:", data);
+          console.log("📌 CTRL:", data);
 
           if (data.event === "START") {
             reset();
             recording = true;
-            console.log("▶ Recording started");
+            console.log("📌 Recording started");
 
             timer = setTimeout(() => {
               endCommand("timeout");
@@ -64,12 +64,12 @@ export function listen(server) {
 
           if (data.event === "TOKEN") {
             if (!data.user_id || typeof data.user_id !== "string") {
-              console.warn("Invalid user_id token");
+              console.warn("📌 Invalid user_id token");
               return;
             }
 
             socket.userId = data.user_id;
-            console.log("👤 User identified:", socket.userId);
+            console.log("📌 User identified:", socket.userId);
             return;
           }
 
@@ -91,20 +91,20 @@ export function listen(server) {
     });
 
     socket.on("close", () => {
-      console.log("❌ Mic disconnected");
+      console.log("📌 Mic disconnected");
       endCommand("disconnect");
     });
   });
 }
 
-async function DetectIntentOfText(text, userID, socket) {
+export async function DetectIntentOfText(text, userID, socket) {
   try {
     //Here the detect intent function is internally handelling intent detection + command execution + storing agenitc memory and then returning the final text which should be converted to speech and sent back to the user device
     const result = await detectIntent(text, userID);
     if(!result){
-      console.error("No result from App side.");
+      console.error("📌 No result from App side.");
     }
-    console.log("Synchora Said:", result)
+    console.log("📌 Synchora Said:", result,"\n\n")
     // runTTS(result, socket);
   } catch (err) {
     console.error("Error in starting the intent detection process:", err);
@@ -118,7 +118,7 @@ function ValidateToken(userID){
   }
   const DeviceToken = process.env.DEVICE_ID;
   if(!DeviceToken){
-    console.error("❌ DEVICE_ID not set in environment variables");
+    console.error("📌 DEVICE_ID not set in environment variables");
   }
   return userID == DeviceToken;
 }
@@ -133,12 +133,12 @@ async function runSTT(pcmBuffer, socket) {
 
   py.on("error", (err) => {
     errored = true;
-    console.error("❌ Python spawn failed:", err.message);
-    socket.send("❌ Python not available");
+    console.error("📌 Python spawn failed:", err.message);
+    socket.send("📌 Python not available");
   });
 
   py.stderr.on("data", (e) => {
-    console.error("PY ERR:", e.toString());
+    console.error("📌 PY ERR:", e.toString());
   });
 
   py.stdout.on("data", (d) => {
@@ -149,13 +149,13 @@ async function runSTT(pcmBuffer, socket) {
     if (errored) return;
 
     if (!output.trim()) {
-      socket.send("❌ STT failed");
+      socket.send("📌 STT failed");
       return;
     }
 
     try {
       const result = JSON.parse(output);
-      console.log("STT Result:", result);
+      console.log("📌 STT Result:", result);
       if (result) {
         const valid = ValidateToken(socket.userId)
         if (valid && result.success){
