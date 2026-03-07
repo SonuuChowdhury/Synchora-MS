@@ -1,4 +1,6 @@
 import SynchoraBot from "../config/bot.config.js";
+import detectIntent from "../assistant.tasks/detect.intent.app.js";
+import chalk from "chalk";
 
 import dotenv from "dotenv";
 dotenv.config({ quiet: true });
@@ -59,14 +61,15 @@ SynchoraBot.on("message", async (msg) => {
   );
   return;
 }
-
-  console.log("Message:", text);
-  console.log("Chat ID:", chatId);
-
-  // your agent logic
-  let response = "Agent received: " + text;
-
-  SynchoraBot.sendMessage(chatId, response);
+  console.log("📌 " + chalk.magenta("User connected via telegram bot: "), text);
+  try{
+    await SynchoraBot.sendChatAction(chatId, "typing");
+    const response = await detectIntent(text);
+    console.log("📌 " + chalk.magenta("Synchora Said:"), response,"\n\n");
+    SynchoraBot.sendMessage(chatId, response);
+  } catch (error) {
+    console.error("📌 Error while handeling telegram bot:", error);
+  }
 
 });
 

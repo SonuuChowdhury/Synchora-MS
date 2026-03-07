@@ -2,6 +2,7 @@ import { WebSocketServer } from "ws";
 import { spawn } from "child_process";
 import detectIntent from "./src/assistant.tasks/detect.intent.app.js";
 import dotenv from "dotenv";
+import chalk from "chalk";
 
 dotenv.config({ quiet: true });
 
@@ -15,7 +16,7 @@ export function listen(server) {
   const wss = new WebSocketServer({ server });
 
   wss.on("connection", (socket) => {
-    console.log("📌 User connected via synchora device(websocket protocol)");
+    console.log("📌 " + chalk.magenta("User connected via synchora device(websocket protocol)"));
 
     let recording = false;
     let audioBuffer = Buffer.alloc(0);
@@ -33,8 +34,8 @@ export function listen(server) {
       recording = false;
       if (timer) clearTimeout(timer);
 
-      console.log("📌 Command ended:", reason);
-      console.log("📌 Audio bytes:", audioBuffer.length);
+      console.log("📌 " + chalk.magenta("Command ended: ") + reason);
+      console.log("📌 " + chalk.magenta("Audio bytes: ") + audioBuffer.length);
 
       if (audioBuffer.length >= MIN_BYTES) {
         runSTT(audioBuffer, socket);
@@ -50,12 +51,12 @@ export function listen(server) {
       if (!isBinary) {
         try {
           const data = JSON.parse(msg.toString());
-          console.log("📌 CTRL:", data);
+          console.log("📌 " + chalk.magenta("CTRL:"), data);
 
           if (data.event === "START") {
             reset();
             recording = true;
-            console.log("📌 Recording started");
+            console.log("📌 " + chalk.magenta("Recording started"));
 
             timer = setTimeout(() => {
               endCommand("timeout");
@@ -69,7 +70,7 @@ export function listen(server) {
             }
 
             socket.userId = data.user_id;
-            console.log("📌 User identified:", socket.userId);
+            console.log("📌 " + chalk.magenta("User identified:"), socket.userId);
             return;
           }
 
@@ -91,20 +92,20 @@ export function listen(server) {
     });
 
     socket.on("close", () => {
-      console.log("📌 Mic disconnected");
+      console.log("📌 " + chalk.magenta("Mic disconnected"));
       endCommand("disconnect");
     });
   });
 }
 
-export async function DetectIntentOfText(text, userID, socket) {
+export async function DetectIntentOfText(text, socket) {
   try {
     //Here the detect intent function is internally handelling intent detection + command execution + storing agenitc memory and then returning the final text which should be converted to speech and sent back to the user device
-    const result = await detectIntent(text, userID);
+    const result = await detectIntent(text);
     if(!result){
       console.error("📌 No result from App side.");
     }
-    console.log("📌 Synchora Said:", result,"\n\n")
+    console.log("📌 " + chalk.magenta("Synchora Said:"), result,"\n\n")
     // runTTS(result, socket);
   } catch (err) {
     console.error("Error in starting the intent detection process:", err);
@@ -155,17 +156,17 @@ async function runSTT(pcmBuffer, socket) {
 
     try {
       const result = JSON.parse(output);
-      console.log("📌 STT Result:", result);
+      console.log("📌 " + chalk.magenta("STT Result:"), result);
       if (result) {
         const valid = ValidateToken(socket.userId)
         if (valid && result.success){
-          DetectIntentOfText(result.text, socket.userId, socket);
+          DetectIntentOfText(result.text, socket);
         }else{
-          console.log("❌ Invalid command or missing user token");
+          console.log("❌ " + chalk.magenta("Invalid command or missing user token"));
           return;
         }
       } else {
-        console.log("❌ " + result.error);
+        console.log("❌ " + chalk.magenta("STT Error: ") + result.error);
       }
     } catch {
       console.error("❌ STT parse error");

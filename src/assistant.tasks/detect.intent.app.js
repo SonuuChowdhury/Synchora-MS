@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import { RunnableSequence } from "@langchain/core/runnables";
 import GeminiInDetModel from "../config/geminiDetectionModel.config.js";
 import appHandler from "./app.handeller.js";
+import chalk from "chalk";
 
 dotenv.config({ quiet: true });
 
@@ -33,7 +34,7 @@ export default async function detectIntent(text) {
       throw new Error("Invalid intent response format");
     }
 
-    console.log("📌 Intent:", parsed.intent, "Confidence:", parsed.confidence);
+    console.log("📌 " + chalk.magenta("Intent:"), parsed.intent, "Confidence:", parsed.confidence);
     // now the intent is detrected for the text and now the text and intent will be passed to the app handeller where the tasks will be executed based on the intent and response will be generated and then sent back to the listen.js where runTTS function will handle the response.
     const resultFromApp = await appHandler(text, parsed);
     return resultFromApp;
