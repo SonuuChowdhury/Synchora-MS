@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const connectDB = async () => {
     try {
@@ -14,7 +14,7 @@ const connectDB = async () => {
         console.error("MONGODB connection FAILED", error);
         process.exit(1); // Exit process with failure
     }finally{
-        console.log("MongoDB is connected Succesfully.🐱‍🏍")
+        return;
     }
 };
 
