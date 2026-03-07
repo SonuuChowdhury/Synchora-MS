@@ -1,7 +1,7 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import dotenv from "dotenv";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const GeminiInDetModel = new ChatGoogleGenerativeAI({
   model: "gemini-2.5-flash",

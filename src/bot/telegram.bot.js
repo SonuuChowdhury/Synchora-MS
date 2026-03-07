@@ -1,7 +1,7 @@
 import SynchoraBot from "../config/bot.config.js";
 
 import dotenv from "dotenv";
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const userID =  process.env.TELEGRAM_CHAT_ID;
 

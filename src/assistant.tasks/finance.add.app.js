@@ -7,7 +7,7 @@ import SaveChat from "../db.tasks/chat.save.app.js";
 import GetUser from "../db.tasks/user.get.app.js";
 import FinanceMemory from "../model/finance.model.js";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const financeChain = RunnableSequence.from([
   financeAddPrompt,

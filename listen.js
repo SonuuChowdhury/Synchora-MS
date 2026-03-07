@@ -3,7 +3,7 @@ import { spawn } from "child_process";
 import detectIntent from "./src/assistant.tasks/detect.intent.app.js";
 import dotenv from "dotenv";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const SAMPLE_RATE = 16000;
 const BYTES_PER_SEC = SAMPLE_RATE * 2;

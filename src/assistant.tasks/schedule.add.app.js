@@ -9,7 +9,7 @@ import GetUser from "../db.tasks/user.get.app.js";
 
 import ScheduleMemory from "../model/schedule.model.js";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const scheduleChain = RunnableSequence.from([
   scheduleAddPrompt,

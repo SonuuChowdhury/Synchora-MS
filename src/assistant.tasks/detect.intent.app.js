@@ -4,7 +4,7 @@ import { RunnableSequence } from "@langchain/core/runnables";
 import GeminiInDetModel from "../config/geminiDetectionModel.config.js";
 import appHandler from "./app.handeller.js";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const intentChain = RunnableSequence.from([
   intentPrompt,
