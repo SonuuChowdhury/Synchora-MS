@@ -1,8 +1,8 @@
-import chatApp from "./chat.app.js";
-import financeAddApp from "./finance.add.app.js";
-import financeQueryApp from "./finance.query.app.js";
-import scheduleAddApp from "./schedule.add.app.js";
-import scheduleQueryApp from "./schedule.query.app.js";
+import chatApp from "./tasks.chain/chat.app.js";
+import financeAddApp from "./tasks.chain/finance.add.app.js";
+import financeQueryApp from "./tasks.chain/finance.query.app.js";
+import scheduleAddApp from "./tasks.chain/schedule.add.app.js";
+import scheduleQueryApp from "./tasks.chain/schedule.query.app.js";
 
 export default async function appHandler(text, intent){
     if(!intent || !intent.intent){

@@ -1,11 +1,11 @@
 import { RunnableSequence } from "@langchain/core/runnables";
-import GeminiMainModel from "../config/geminiMainModel.config.js";
+import GeminiMainModel from "../../config/geminiMainModel.config.js";
 import dotenv from "dotenv";
-import financeAddPrompt from "../prompts/finance.add.prompt.js";
-import GetChatHistory from "../db.tasks/chat.get.app.js";
-import SaveChat from "../db.tasks/chat.save.app.js";
-import GetUser from "../db.tasks/user.get.app.js";
-import FinanceMemory from "../model/finance.model.js";
+import financeAddPrompt from "../../prompts/finance.add.prompt.js";
+import GetChatHistory from "../../db.tasks/chat.get.app.js";
+import SaveChat from "../../db.tasks/chat.save.app.js";
+import GetUser from "../../db.tasks/user.get.app.js";
+import FinanceMemory from "../../model/finance.model.js";
 
 dotenv.config({ quiet: true });
 

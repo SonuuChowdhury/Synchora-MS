@@ -1,6 +1,6 @@
 import { WebSocketServer } from "ws";
 import { spawn } from "child_process";
-import detectIntent from "./src/assistant.tasks/detect.intent.app.js";
+import detectIntent from "./src/assistant.tasks/tasks.chain/detect.intent.app.js";
 import dotenv from "dotenv";
 import chalk from "chalk";
 

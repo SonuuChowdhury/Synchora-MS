@@ -1,8 +1,8 @@
-import intentPrompt from "../prompts/detectIntent.prompt.js";
+import intentPrompt from "../../prompts/detectIntent.prompt.js";
 import dotenv from "dotenv";
 import { RunnableSequence } from "@langchain/core/runnables";
-import GeminiInDetModel from "../config/geminiDetectionModel.config.js";
-import appHandler from "./app.handeller.js";
+import GeminiInDetModel from "../../config/geminiDetectionModel.config.js";
+import appHandler from "../app.handeller.js";
 import chalk from "chalk";
 
 dotenv.config({ quiet: true });

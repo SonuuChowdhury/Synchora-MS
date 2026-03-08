@@ -1,10 +1,10 @@
 import { RunnableSequence } from "@langchain/core/runnables";
-import GeminiMainModel from "../config/geminiMainModel.config.js";
-import financeQueryPrompt from "../prompts/finance.query.prompt.js";
-import GetChatHistory from "../db.tasks/chat.get.app.js";
-import SaveChat from "../db.tasks/chat.save.app.js";
-import GetUser from "../db.tasks/user.get.app.js";
-import GetFinanceHistory from "../db.tasks/finance.get.app.js";
+import GeminiMainModel from "../../config/geminiMainModel.config.js";
+import financeQueryPrompt from "../../prompts/finance.query.prompt.js";
+import GetChatHistory from "../../db.tasks/chat.get.app.js";
+import SaveChat from "../../db.tasks/chat.save.app.js";
+import GetUser from "../../db.tasks/user.get.app.js";
+import GetFinanceHistory from "../../db.tasks/finance.get.app.js";
 
 const financeQueryChain = RunnableSequence.from([
   financeQueryPrompt,

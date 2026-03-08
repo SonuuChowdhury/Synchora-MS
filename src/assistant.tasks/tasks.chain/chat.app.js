@@ -1,11 +1,11 @@
 import { RunnableSequence } from "@langchain/core/runnables";
-import GeminiMainModel from "../config/geminiMainModel.config.js";
+import GeminiMainModel from "../../config/geminiMainModel.config.js";
 import dotenv from "dotenv";
-import GetChatHistory from "../db.tasks/chat.get.app.js";
-import chatPrompt from "../prompts/chat.prompt.js";
-import SaveChat from "../db.tasks/chat.save.app.js";
-import GetUser from "../db.tasks/user.get.app.js";
-import SaveUser from "../db.tasks/user.save.app.js";
+import GetChatHistory from "../../db.tasks/chat.get.app.js";
+import chatPrompt from "../../prompts/chat.prompt.js";
+import SaveChat from "../../db.tasks/chat.save.app.js";
+import GetUser from "../../db.tasks/user.get.app.js";
+import SaveUser from "../../db.tasks/user.save.app.js";
 
 import fs from "fs";
 import path from "path";
@@ -14,7 +14,7 @@ import { fileURLToPath } from "url";
 dotenv.config({ quiet: true });
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename)
-const modelDataPath = path.join(__dirname, "../json/meta.data.json");
+const modelDataPath = path.join(__dirname, "../../json/meta.data.json");
 const modelData = JSON.parse(
   fs.readFileSync(modelDataPath, "utf-8")
 );

@@ -1,11 +1,11 @@
 import { RunnableSequence } from "@langchain/core/runnables";
-import GeminiMainModel from "../config/geminiMainModel.config.js";
-import scheduleQueryPrompt from "../prompts/schedule.query.prompt.js";
+import GeminiMainModel from "../../config/geminiMainModel.config.js";
+import scheduleQueryPrompt from "../../prompts/schedule.query.prompt.js";
 
-import GetChatHistory from "../db.tasks/chat.get.app.js";
-import SaveChat from "../db.tasks/chat.save.app.js";
-import GetUser from "../db.tasks/user.get.app.js";
-import GetScheduleHistory from "../db.tasks/schedule.get.app.js";
+import GetChatHistory from "../../db.tasks/chat.get.app.js";
+import SaveChat from "../../db.tasks/chat.save.app.js";
+import GetUser from "../../db.tasks/user.get.app.js";
+import GetScheduleHistory from "../../db.tasks/schedule.get.app.js";
 
 const scheduleQueryChain = RunnableSequence.from([
   scheduleQueryPrompt,

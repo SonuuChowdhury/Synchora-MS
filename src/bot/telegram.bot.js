@@ -1,5 +1,5 @@
 import SynchoraBot from "../config/bot.config.js";
-import detectIntent from "../assistant.tasks/detect.intent.app.js";
+import detectIntent from "../assistant.tasks/tasks.chain/detect.intent.app.js";
 import chalk from "chalk";
 
 import dotenv from "dotenv";
