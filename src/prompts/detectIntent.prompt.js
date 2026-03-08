@@ -20,6 +20,7 @@ INTENTS (choose ONLY one):
 - "schedule_query" → User wants to know something about their schedule
 - "finance_add" → User wants to log or note an expense or financial entry
 - "finance_query" → User wants to query past expenses or finances
+- "research_query" → User wants to ask a question that requires web research or User asks for general knowledge, factual information, explanations, or learning questions such like RAG systems
 - "emergency_help" → User is in a serious emergency (medical, danger, critical help)
 - "chat" → General conversation, personal talk, or informational questions
 - "no_support" → Request is outside supported features

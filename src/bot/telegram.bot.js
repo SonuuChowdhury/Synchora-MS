@@ -65,6 +65,11 @@ SynchoraBot.on("message", async (msg) => {
   try{
     await SynchoraBot.sendChatAction(chatId, "typing");
     const response = await detectIntent(text);
+    if(!response){
+      console.error(chalk.magenta("📢 No response generated for the input: " + text));
+      SynchoraBot.sendMessage(chatId, "Sorry, There was an internal agentic error on my system. Please try again later.");
+      return;
+    }
     console.log("📌 " + chalk.magenta("Synchora Said:"), response,"\n\n");
     SynchoraBot.sendMessage(chatId, response);
   } catch (error) {

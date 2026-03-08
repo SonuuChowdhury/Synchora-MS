@@ -40,7 +40,7 @@ export default async function detectIntent(text) {
     return resultFromApp;
 
   } catch (error) {
-    console.error("Intent detection failed:", error.message);
-    return { intent: "error", confidence: 0.0 };
+    console.error(chalk.magenta('\n📢 Intent detection failed:') + error.message+ "\n" + chalk.magenta('📢 Detailed error: ')+ error);
+    return "Sorry, There was an internal agentic error on my system. Please try again later.";
   }
 }
