@@ -12,6 +12,7 @@ import {listen} from "./listen.js";
 import router from "./src/routes/routes.js";
 import connectDB from "./src/db/mongoose.connect.db.js";
 import './src/bot/telegram.bot.js';
+import redisClient from "./src/config/redis.config.js";
 
 dotenv.config({ quiet: true });
 const app = express();
@@ -74,7 +75,10 @@ server.listen(PORT, async () => {
   console.log(chalk.blue("ℹ Initializing Agent...\n"));
 
   connectDB();
-  console.log(chalk.green("✔ Database connected"));
+  console.log(chalk.green("✔ MongoDB connected"));
+
+  await redisClient.connect();
+  console.log(chalk.green("✔ Redis connected"));
 
   listen(server);
   console.log(chalk.green("✔ Socket service started"));

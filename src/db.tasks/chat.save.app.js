@@ -1,4 +1,7 @@
 import ChatMemory from "../model/chat.model.js";
+import redisClient from "../config/redis.config.js";
+
+const CHAT_CACHE_KEY = "synchora:chat_history";
 
 export default async function SaveChat(data) {
   try {
@@ -6,7 +9,6 @@ export default async function SaveChat(data) {
       throw new Error("role and message are required");
     }
 
-    // 🧠 Chat object (defaults handled by schema)
     const chatData = {
       role:data.role,
       message: data.message,
@@ -14,12 +16,7 @@ export default async function SaveChat(data) {
       confidence:data.confidence
     };
 
-    /**
-     * 🔥 Find the single document & push chat
-     * - upsert: true → create doc if not exists
-     * - $push → append to chats array
-     */
-    await ChatMemory.findOneAndUpdate(
+    const updatedDoc = await ChatMemory.findOneAndUpdate(
       {},
       { $push: { chats: chatData } },
       {
@@ -29,13 +26,14 @@ export default async function SaveChat(data) {
       }
     );
 
+    await redisClient.setEx(
+      CHAT_CACHE_KEY,
+      600,
+      JSON.stringify(updatedDoc)
+    );
     return { success: true };
   } catch (error) {
     console.error("SaveChat error:", error);
-
-    return {
-      success: false,
-      error: error.message,
-    };
+    return {success: false, error: error.message,};
   }
 }
