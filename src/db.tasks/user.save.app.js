@@ -19,39 +19,52 @@ export default async function SaveUser(updates = {}) {
       "dislikes",
       "frequently_used_intents",
       "correction_count",
-      "timezone",
+      "timezone"
     ];
 
-    const safeUpdates = {};
+    const safeSet = {};
+    const updateQuery = {};
 
+    // Filter allowed fields
     for (const field of allowedFields) {
       if (updates[field] !== undefined) {
-        safeUpdates[field] = updates[field];
+        safeSet[field] = updates[field];
       }
     }
 
-    safeUpdates.last_interaction = new Date();
+    // Apply $set updates
+    if (Object.keys(safeSet).length > 0) {
+      updateQuery.$set = safeSet;
+    }
+
+    // Handle memories separately
+    if (Array.isArray(updates.memories) && updates.memories.length > 0) {
+      updateQuery.$push = {
+        memories: { $each: updates.memories }
+      };
+    }
+
+    // Always update interaction time
+    updateQuery.$set = {
+      ...updateQuery.$set,
+      last_interaction: new Date()
+    };
 
     const user = await UserMemory.findOneAndUpdate(
       {},
-      { $set: safeUpdates },
+      updateQuery,
       {
         new: true,
         upsert: true,
-        setDefaultsOnInsert: true,
+        setDefaultsOnInsert: true
       }
     ).lean();
 
-    return {
-      success: true,
-      user,
-    };
+    return {success: true,user};
+
   } catch (error) {
     console.error("SaveUser error:", error.message);
-
-    return {
-      success: false,
-      error: error.message,
+    return {success: false,error: error.message
     };
   }
 }
