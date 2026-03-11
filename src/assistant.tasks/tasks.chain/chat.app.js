@@ -42,6 +42,7 @@ export default async function chatApp(text, intent){
             userData: userData,
             modelData: modelData
         });
+        // console.log("input: " , text, "intent: ", intent, "userData: ", userData, "chatHistory: ", chatHistory, "modelData: ", modelData); // Log to check what data going to Model
         if(!result.content){
             console.error("No content generated from chat model");
         }
