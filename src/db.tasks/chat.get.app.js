@@ -12,7 +12,7 @@ export default async function GetChatHistory() {
 
     const chatDoc = await ChatMemory.findOne(
       {},
-      { chats: { $slice: -20 } } // last 20 chats
+      { chats: { $slice: -10 } } // last 20 chats
     ).lean();
 
      await redisClient.setEx(
