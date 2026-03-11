@@ -8,32 +8,33 @@ export default async function SaveChat(data) {
     if (!data.role || !data.message) {
       throw new Error("role and message are required");
     }
-
     const chatData = {
-      role:data.role,
+      role: data.role,
       message: data.message,
       intent_detected: data.intent,
-      confidence:data.confidence
+      confidence: data.confidence,
+      time: new Date().toISOString()
     };
-
     const updatedDoc = await ChatMemory.findOneAndUpdate(
       {},
       { $push: { chats: chatData } },
       {
         upsert: true,
         new: true,
-        setDefaultsOnInsert: true,
+        setDefaultsOnInsert: true
       }
     );
-
+    const recentChats = updatedDoc.chats.slice(-10);
     await redisClient.setEx(
       CHAT_CACHE_KEY,
       600,
-      JSON.stringify(updatedDoc)
+      JSON.stringify(recentChats)
     );
+
     return { success: true };
+
   } catch (error) {
     console.error("SaveChat error:", error);
-    return {success: false, error: error.message,};
+    return { success: false, error: error.message };
   }
 }
