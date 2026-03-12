@@ -48,17 +48,17 @@ User: Who is your developer?
 Be especially careful before classifying **emergency_help** — only choose it if the user clearly indicates danger.
 
 INTENTS (choose ONLY one):
-- "detect_image"
-- "schedule_add"
-- "schedule_query"
-- "finance_add"
-- "finance_query"
-- "research_query"
-- "emergency_help"
-- "chat"
-- "no_support"
-- "no_text"
-- "error"
+- "detect_image" → User wants the device camera to describe surroundings (e.g., “describe what’s around me”)
+- "schedule_add" → User wants to add something to their schedule
+- "schedule_query" → User wants to know something about their schedule
+- "finance_add" → User wants to log or note an expense or financial entry
+- "finance_query" → User wants to query past expenses or finances
+- "research_query" → User wants to ask a question that requires web research or User asks for general knowledge, factual information, explanations, or learning questions such like RAG systems
+- "emergency_help" → User is in a serious emergency (medical, danger, critical help)
+- "chat" → General conversation, personal talk, or informational questions
+- "no_support" → Request is outside supported features
+- "no_text" → Input is empty, null, or meaningless
+- "error" → Intent cannot be confidently understood
 
 USER INPUT:
 "{input}"
