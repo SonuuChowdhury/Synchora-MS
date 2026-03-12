@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import { RunnableSequence } from "@langchain/core/runnables";
 import GeminiInDetModel from "../../config/geminiDetectionModel.config.js";
 import appHandler from "../app.handeller.js";
+import GetChatHistory from "../../db.tasks/chat.get.app.js";
 import chalk from "chalk";
 
 dotenv.config({ quiet: true });
@@ -25,7 +26,8 @@ export default async function detectIntent(text) {
   }
 
   try {
-    const result = await intentChain.invoke({ input: text });
+    const chatHistory = await GetChatHistory();
+    const result = await intentChain.invoke({ input: text, chatHistory });
 
     const clean = cleanJsonOutput(result.content);
     const parsed = JSON.parse(clean);

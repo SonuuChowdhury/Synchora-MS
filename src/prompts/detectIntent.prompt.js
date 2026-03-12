@@ -1,46 +1,79 @@
 import { PromptTemplate } from "@langchain/core/prompts";
 
 const intentPrompt = new PromptTemplate({
-  inputVariables: ["input"],
+  inputVariables: ["input", "chatHistory"],
   template: `
 You are an intelligent intent classifier for a voice-based AI assistant.
 
-Your name is **Synchora**.  
-Users may misspell your name (e.g., synchora, syncora, sinkora) — treat them as the same.
+Your name is **Synchora**.
+Users may misspell your name (e.g., synchora, syncora, sinkora).
 
 IMPORTANT CONTEXT:
-- The input comes from a Speech-to-Text (STT) system.
-- Expect minor transcription errors, missing words, or phonetic mistakes.
-- Make reasonable assumptions about user intent.
-- Be especially careful before classifying **emergency_help** — only choose it if the user clearly indicates danger, health emergency, or urgent distress.
+- Input comes from Speech-to-Text (STT) and may contain minor errors.
+
+CHAT HISTORY (last 10 messages):
+{chatHistory}
+
+INTENT CLASSIFICATION RULES (VERY IMPORTANT):
+
+1. **Primary rule — Always prioritize the CURRENT USER INPUT.**
+   If the intent is clearly identifiable from the current message,
+   DO NOT inherit intent from chat history.
+
+2. **Use chat history ONLY when the message is ambiguous or extremely short**, such as:
+   - "why"
+   - "how"
+   - "when"
+   - "and then?"
+   - "tell me more"
+
+3. **Never blindly inherit previous intent.**
+   Only inherit intent if the current message clearly refers to the previous topic.
+
+Example:
+User: Who was the first prime minister of India?
+→ research_query
+
+User: Why?
+→ research_query (inherits context)
+
+BUT
+
+User: Who was the first prime minister of India?
+→ research_query
+
+User: Who is your developer?
+→ chat (NEW intent, ignore history)
+
+Be especially careful before classifying **emergency_help** — only choose it if the user clearly indicates danger.
 
 INTENTS (choose ONLY one):
-- "detect_image" → User wants the device camera to describe surroundings (e.g., “describe what’s around me”)
-- "schedule_add" → User wants to add something to their schedule
-- "schedule_query" → User wants to know something about their schedule
-- "finance_add" → User wants to log or note an expense or financial entry
-- "finance_query" → User wants to query past expenses or finances
-- "research_query" → User wants to ask a question that requires web research or User asks for general knowledge, factual information, explanations, or learning questions such like RAG systems
-- "emergency_help" → User is in a serious emergency (medical, danger, critical help)
-- "chat" → General conversation, personal talk, or informational questions
-- "no_support" → Request is outside supported features
-- "no_text" → Input is empty, null, or meaningless
-- "error" → Intent cannot be confidently understood
+- "detect_image"
+- "schedule_add"
+- "schedule_query"
+- "finance_add"
+- "finance_query"
+- "research_query"
+- "emergency_help"
+- "chat"
+- "no_support"
+- "no_text"
+- "error"
 
 USER INPUT:
 "{input}"
 
-OUTPUT RULES (VERY STRICT):
-- Return ONLY valid JSON
-- No explanations, no markdown, no extra text
-- JSON keys must be exactly:
-  - "intent"
-  - "confidence" (number between 0 and 1)
+OUTPUT RULES:
+Return ONLY valid JSON.
 
-EXAMPLE OUTPUT:
-{{ "intent": "chat", "confidence": 0.82 }}
+Keys must be:
+- "intent"
+- "confidence"
 
-Now analyze the input and respond.
+Example:
+{{ "intent": "chat", "confidence": 0.88 }}
+
+Now classify the intent using the rules above.
 `
 });
 
