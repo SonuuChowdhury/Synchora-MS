@@ -20,7 +20,7 @@ function cleanJsonOutput(text) {
     .trim();
 }
 
-export default async function detectIntent(text) {
+export default async function detectIntent(text, isTelegramClient = false) {
   if (!text || typeof text !== "string" || text.trim().length === 0) {
     return { intent: "no_text", confidence: 1.0 };
   }
@@ -38,7 +38,7 @@ export default async function detectIntent(text) {
 
     console.log("📌 " + chalk.magenta("Intent:"), parsed.intent, "Confidence:", parsed.confidence);
     // now the intent is detrected for the text and now the text and intent will be passed to the app handeller where the tasks will be executed based on the intent and response will be generated and then sent back to the listen.js where runTTS function will handle the response.
-    const resultFromApp = await appHandler(text, parsed);
+    const resultFromApp = await appHandler(text, parsed, isTelegramClient);
     return resultFromApp;
 
   } catch (error) {

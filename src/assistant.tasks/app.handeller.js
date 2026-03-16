@@ -5,7 +5,7 @@ import scheduleAddApp from "./tasks.chain/schedule.add.app.js";
 import scheduleQueryApp from "./tasks.chain/schedule.query.app.js";
 import {researchAgent} from "./task.graph/autonomous.research.agent.js";
 
-export default async function appHandler(text, intent){
+export default async function appHandler(text, intent, isTelegramClient){
     if(!intent || !intent.intent){
         console.error("Invalid intent data");
         return;
@@ -22,8 +22,9 @@ export default async function appHandler(text, intent){
     }else if(intent.intent === "research_query"){
         const researchQueryResponse = await researchAgent.invoke({
             userQuery: text,
-            searchQuery: text,
-            searchResults: []
+            intent: intent.intent,
+            confidence: intent.confidence,
+            allowHTML: isTelegramClient
         });
         return researchQueryResponse.finalAnswer || "I'm sorry, I couldn't find a clear answer to your question.";
     }else if(intent.intent === "error"){

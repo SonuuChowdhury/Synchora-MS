@@ -68,7 +68,7 @@ SynchoraBot.on("message", async (msg) => {
       SynchoraBot.sendChatAction(chatId, "typing");
     }, 4000);
     // ----------------------------------------
-    const response = await detectIntent(text);
+    const response = await detectIntent(text, true);
     clearInterval(typingInterval);
     // -------- STOP TYPING WHEN DONE --------
     if(!response){

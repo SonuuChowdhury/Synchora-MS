@@ -1,103 +1,235 @@
 import dotenv from "dotenv";
-import { StateGraph, END } from  '@langchain/langgraph'
+import { StateGraph, END } from "@langchain/langgraph";
 import GeminiMainModel from "../../config/geminiMainModel.config.js";
 import searchTool from "../../config/scraper.config.js";
-import researchPrompt from "../../prompts/research.prompt.js";
+import researchThink from "../../prompts/research.think.prompt.js";
+import redisClient from "../../config/redis.config.js";
+import GetChatHistory from "../../db.tasks/chat.get.app.js";
 import SaveChat from "../../db.tasks/chat.save.app.js";
 import chalk from "chalk";
 
 dotenv.config({ quiet: true });
-const MAX_RETRIES = 2;
 
-// -------- SEARCH NODE --------
-async function searchNode(state) {
-  const queryToUse = state.augmentedQuery || state.userQuery;
-  try{
-    console.log(chalk.cyan("🧠 Research Agent: ") +"Searching the web...");
-    const results = await searchTool.invoke({input: queryToUse});
-    return {...state, searchResults: results};
-  }catch(error){
-    console.error(chalk.magenta('\n📢 Serp API Search failed:') + error.message+ "\n" + chalk.magenta('📢 Detailed error: ')+ error);
-  }
-}
+const SEARCH_CACHE_KEY = "synchora:research_cache";
 
-// -------- SUMMARIZE NODE --------
-async function summarizeNode(state) {
-  try{
-    const prompt = await researchPrompt.format({
-    userQuery: state.userQuery,
-    searchQuery: state.augmentedQuery || state.userQuery,
-    searchResults: JSON.stringify(state.searchResults)
-  });
-  console.log(chalk.cyan("🧠 Research Agent: ") +"Summarizing search results...");
-  const res = await GeminiMainModel.invoke(prompt);
-  const cleaned = res.content.replace(/```json/g, "").replace(/```/g, "").trim();
-  const parsed = JSON.parse(cleaned);
+/*
+Important research safety limits
+*/
+const MAX_SEARCH_STEPS = 3;
 
-  // ✅ FINAL ANSWER
-  if (parsed.final) {
-    const answer = parsed.answer;
-    // save chat using your function
-    await SaveChat({
-      role: "synchora",
-      message: answer,
-      intent: "research_query",
-      confidence: 0.95
+// ---------------- THINK NODE ----------------
+
+async function thinkNode(state) {
+  console.log(chalk.cyan("🧠 Research Agent: ") + "Analyzing history...");
+
+  try {
+
+    // Save user chat once
+    if (!state.isUserChatSaved) {
+      await SaveChat({
+        role: "user",
+        message: state.userQuery,
+        intent: state.intent,
+        confidence: state.confidence,
+      });
+
+      state.isUserChatSaved = true;
+    }
+
+    const history = await redisClient.get(SEARCH_CACHE_KEY);
+    const recentChats = await GetChatHistory();
+
+    let formattedHistory = "No search history available.";
+
+    if (history) {
+      try {
+        const parsed = JSON.parse(history);
+        formattedHistory = parsed
+          .map((d) => {
+            return `Query: ${d.query}\nResults: ${JSON.stringify(d.results).slice(0, 1200)}\nTime: ${d.time}`;
+          })
+          .join("\n\n");
+      } catch {
+        formattedHistory = history;
+      }
+    }
+
+    let formattedChats = "No recent chats available.";
+
+    if (recentChats && recentChats.length) {
+      formattedChats = recentChats
+        .slice(-10)
+        .map((c) => `${c.role}: ${c.message}`)
+        .join("\n");
+    }
+
+    const prompt = await researchThink.format({
+      userQuery: state.userQuery,
+      recentChats: formattedChats,
+      searchHistory: formattedHistory,
+      allowHTML: state.allowHTML,
     });
+
+    const res = await GeminiMainModel.invoke(prompt);
+
+    const cleaned = res.content
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+
+    let parsed;
+
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (err) {
+      console.error(chalk.red("JSON Parse Failed:"), cleaned);
+
+      return {
+        ...state,
+        done: true,
+        finalAnswer: "I couldn't process the research results.",
+      };
+    }
+
+    if (parsed.found) {
+      console.log(chalk.green("🧠 Research Agent: Answer resolved."));
+
+      await SaveChat({
+        role: "synchora",
+        message: parsed.answer,
+        intent: state.intent,
+        confidence: state.confidence,
+      });
+
+      return {
+        ...state,
+        finalAnswer: parsed.answer,
+        done: true,
+      };
+    }
+
+    /*
+    Prevent infinite research loops
+    */
+    if ((state.searchCount || 0) >= MAX_SEARCH_STEPS) {
+      console.log(
+        chalk.yellow("🧠 Research Agent: Search limit reached, forcing answer.")
+      );
+
+      const fallbackAnswer =
+        "I gathered some information but could not perform further searches. Here is the best available answer based on current results.";
+
+      return {
+        ...state,
+        finalAnswer: fallbackAnswer,
+        done: true,
+      };
+    }
+
+    console.log(chalk.yellow("🧠 Research Agent: Need web search."));
+
     return {
       ...state,
-      finalAnswer: answer,
-      done: true
+      augmentedQuery: parsed.preSearchAugmentedQuery,
+      searchCount: (state.searchCount || 0) + 1,
+      done: false,
     };
-  }
+  } catch (error) {
+    console.error(chalk.magenta("📢 Research thinking failed: "), error);
 
-  // 🔁 NEED RETRY
-  return {
-    ...state,
-    augmentedQuery: parsed.better_search_query,
-    retryCount: (state.retryCount || 0) + 1,
-    done: false
-  };
-  }catch(error){
-    console.error(chalk.magenta('\n📢 Research summarization failed:') + error.message+ "\n" + chalk.magenta('📢 Detailed error: ')+ error);
+    return {
+      ...state,
+      done: true,
+      finalAnswer: "Research module encountered an error.",
+    };
   }
 }
 
+// ---------------- SEARCH NODE ----------------
 
-// -------- DECISION NODE --------
+async function searchNode(state) {
+  console.log(chalk.cyan("🌐 Research Agent: Searching web..."));
+
+  try {
+    console.log(chalk.blue("🔍 Searching for: ") + state.augmentedQuery);
+    const results = await searchTool.invoke({
+      input: state.augmentedQuery,
+    });
+
+    const doc = {
+      query: state.augmentedQuery,
+      results,
+      time: new Date().toISOString(),
+    };
+
+    const existing = await redisClient.get(SEARCH_CACHE_KEY);
+
+    let docs = [];
+
+    if (existing) {
+      docs = JSON.parse(existing);
+    }
+
+    docs.push(doc);
+
+    // keep last 10 searches
+    if (docs.length > 10) docs.shift();
+
+    await redisClient.setEx(SEARCH_CACHE_KEY, 600, JSON.stringify(docs));
+
+    console.log(chalk.green("🌐 Research Agent: Search cached."));
+
+    return {
+      ...state,
+      searchResults: results,
+    };
+  } catch (error) {
+    console.error(chalk.magenta("📢 SERP Search failed: "), error);
+
+    return state;
+  }
+}
+
+// ---------------- DECISION NODE ----------------
+
 function decisionNode(state) {
-  if (state.done) {
-    console.log(chalk.cyan("🧠 Research Agent: ") +"prepairing final output...");
-    return END};
-  if (state.retryCount >= MAX_RETRIES) {
-    console.log(chalk.cyan("🧠 Research Agent: ") +"reached threshold evaluation limit, returning final answer...");
+  if (state.done) return END;
+
+  if ((state.searchCount || 0) >= MAX_SEARCH_STEPS) {
+    console.log(chalk.red("🧠 Research Agent: Max search limit reached."));
     return END;
   }
-  console.log(chalk.cyan("🧠 Research Agent: ") +"Retrying search with augmentated query...");
+
   return "search";
 }
 
-// -------- GRAPH --------
+// ---------------- GRAPH ----------------
+
 const graph = new StateGraph({
   channels: {
     userQuery: "string",
     augmentedQuery: "string",
     searchResults: "json",
     finalAnswer: "string",
-    retryCount: "number",
-    done: "boolean"
-  }
+    searchCount: "number",
+    done: "boolean",
+    allowHTML: "boolean",
+    intent: "string",
+    confidence: "number",
+    isUserChatSaved: "boolean",
+  },
 });
 
+graph.addNode("think", thinkNode);
 graph.addNode("search", searchNode);
-graph.addNode("summarize", summarizeNode);
-graph.setEntryPoint("search");
-graph.addEdge("search", "summarize");
-graph.addConditionalEdges("summarize",decisionNode,
-  {
-    search: "search",
-    [END]: END
-  }
-);
+
+graph.setEntryPoint("think");
+
+graph.addConditionalEdges("think", decisionNode, {
+  search: "search",
+  [END]: END,
+});
+
+graph.addEdge("search", "think");
 
 export const researchAgent = graph.compile();
