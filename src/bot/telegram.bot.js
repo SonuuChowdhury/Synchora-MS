@@ -49,10 +49,9 @@ For source code and documentation:
 });
 
 SynchoraBot.on("message", async (msg) => {
-  if (msg.text.startsWith("/")) return; // Ignore commands
+  if (msg.text.startsWith("/")) return;
   const chatId = msg.chat.id;
   const text = msg.text;
-
   if (chatId.toString() !== userID) {
   SynchoraBot.sendMessage(
     chatId,
@@ -63,18 +62,29 @@ SynchoraBot.on("message", async (msg) => {
 }
   console.log("📌 " + chalk.magenta("User connected via telegram bot: "), text);
   try{
+    // -------- START CONTINUOUS TYPING --------
     await SynchoraBot.sendChatAction(chatId, "typing");
+    const typingInterval = setInterval(() => {
+      SynchoraBot.sendChatAction(chatId, "typing");
+    }, 4000);
+    // ----------------------------------------
     const response = await detectIntent(text);
+    clearInterval(typingInterval);
+    // -------- STOP TYPING WHEN DONE --------
     if(!response){
       console.error(chalk.magenta("📢 No response generated for the input: " + text));
       SynchoraBot.sendMessage(chatId, "Sorry, There was an internal agentic error on my system. Please try again later.");
       return;
     }
     console.log("📌 " + chalk.magenta("Synchora Said:"), response,"\n\n");
-    SynchoraBot.sendMessage(chatId, response);
+    // -------- HTML AUTO-DETECTION --------
+    const containsHTML = /<\/?[a-z][\s\S]*>/i.test(response);
+    if(containsHTML){
+      SynchoraBot.sendMessage(chatId, response, { parse_mode: "HTML" });
+    }else{
+      SynchoraBot.sendMessage(chatId, response);
+    }
   } catch (error) {
     console.error("📌 Error while handeling telegram bot:", error);
   }
-
 });
-
