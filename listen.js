@@ -3,6 +3,8 @@ import { spawn } from "child_process";
 import detectIntent from "./src/assistant.tasks/tasks.chain/detect.intent.app.js";
 import dotenv from "dotenv";
 import chalk from "chalk";
+import fs from "fs";
+import path from "path";
 
 dotenv.config({ quiet: true });
 
@@ -125,6 +127,18 @@ function ValidateToken(userID){
 }
 
 async function runSTT(pcmBuffer, socket) {
+  // ── Save raw PCM for debugging ──────────────────────────────────────────
+  const debugDir = "./debug_audio";
+  if (!fs.existsSync(debugDir)) fs.mkdirSync(debugDir);
+  const filename = `${debugDir}/audio_${Date.now()}.pcm`;
+  fs.writeFileSync(filename, pcmBuffer);
+  console.log(`📌 [STT] Audio saved to ${filename} (${pcmBuffer.length} bytes, ~${(pcmBuffer.length / (16000 * 2)).toFixed(2)}s)`);
+  // ────────────────────────────────────────────────────────────────────────
+
+  console.log(`📌 [STT] Starting STT process...`);
+  console.log(`📌 [STT] Buffer size: ${pcmBuffer.length} bytes`);
+  console.log(`📌 [STT] Socket userId: ${socket.userId}`);
+
   const py = spawn("python", ["src/stt/stt.py"], {
     stdio: ["pipe", "pipe", "pipe"],
   });
@@ -134,49 +148,66 @@ async function runSTT(pcmBuffer, socket) {
 
   py.on("error", (err) => {
     errored = true;
-    console.error("📌 Python spawn failed:", err.message);
+    console.error("📌 [STT] Python spawn failed:", err.message);
     socket.send("📌 Python not available");
   });
 
   py.stderr.on("data", (e) => {
-    console.error("📌 PY ERR:", e.toString());
+    console.error("📌 [STT] Python stderr:", e.toString());
   });
 
   py.stdout.on("data", (d) => {
     output += d.toString();
+    console.log("📌 [STT] Python stdout chunk received");
   });
 
   py.on("close", (code) => {
+    console.log(`📌 [STT] Python process closed with code: ${code}`);
+    console.log(`📌 [STT] Raw output: "${output.trim()}"`);
+
     if (errored) return;
 
     if (!output.trim()) {
+      console.error("📌 [STT] Empty output from Python");
       socket.send("📌 STT failed");
       return;
     }
 
     try {
       const result = JSON.parse(output);
-      console.log("📌 " + chalk.magenta("STT Result:"), result);
+      console.log("📌 [STT] Parsed result:", result);
+
       if (result) {
-        const valid = ValidateToken(socket.userId)
-        if (valid && result.success){
+        const valid = ValidateToken(socket.userId);
+        console.log(`📌 [STT] Token valid: ${valid}, userId: ${socket.userId}`);
+
+        if (!valid) {
+          console.log("❌ [STT] Invalid token, userId:", socket.userId);
+        }
+
+        if (valid && result.success) {
+          console.log(`📌 [STT] Recognized text: "${result.text}"`);
           DetectIntentOfText(result.text, socket);
-        }else{
-          console.log("❌ " + chalk.magenta("Invalid command or missing user token"));
+        } else if (valid && !result.success) {
+          console.log(`❌ [STT] STT failed: ${result.error}`);
+        } else {
+          console.log("❌ [STT] Invalid command or missing user token");
           return;
         }
       } else {
-        console.log("❌ " + chalk.magenta("STT Error: ") + result.error);
+        console.log("❌ [STT] Null result from STT");
       }
-    } catch {
-      console.error("❌ STT parse error");
+    } catch (e) {
+      console.error("❌ [STT] JSON parse error:", e.message);
+      console.error("❌ [STT] Raw output was:", output);
     }
   });
 
-  // 🚨 CRITICAL: only write if process is alive
   if (!errored) {
+    console.log("📌 [STT] Writing PCM buffer to Python stdin...");
     py.stdin.write(pcmBuffer);
     py.stdin.end();
+    console.log("📌 [STT] PCM buffer written, stdin closed");
   }
 }
 
