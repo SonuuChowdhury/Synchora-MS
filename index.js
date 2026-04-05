@@ -52,7 +52,7 @@ ${chalk.bold("AI Automation Agent")}
 
 ${chalk.green("Status")}                : Running
 ${chalk.magenta("GitHub Repository")}     : https://github.com/SonuuChowdhury/Synchora-MS
-${chalk.yellow("Web Site")}              : https://synchora-ai-powerd-smart-arm-band.vercel.app
+${chalk.yellow("Web Site")}              : https://synchora-seven.vercel.app
 ${chalk.cyan("Developer")}             : Sonu Chowdhury
 ${chalk.cyan("Developer Portfolio")}   : https://portfolio-sonuuchowdhury.vercel.app
 ${chalk.cyan("Support")}               : chowdhurysonu047@gmail.com
