@@ -1,8 +1,8 @@
-# Synchora — AI Agent
+# Synchora — AI Automation Agent
 
 > Voice-controlled AI assistant designed to connect with a wearable device, with full backend automation, NLP intent detection, finance tracking, scheduling, web research, and Telegram integration.
 
-🌐 [Website](https://synchora-seven.vercel.app/) · 📁 [GitHub](https://github.com/SonuuChowdhury/Synchora-MS) · 👤 [Developer Portfolio](https://portfolio-sonuuchowdhury.vercel.app)
+🌐 [Website](https://synchora-seven.vercel.app/) · 📁 [GitHub](https://github.com/SonuuChowdhury/Synchora-MS) · 👤 [Developer Portfolio](https://portfolio-sonuuchowdhury.vercel.app) · 📓 [Build Logbook](https://docs.google.com/document/d/18II7gRaO29cJ0GnAKNLhQsrgbbmvOMZdw-WH79EImz4/edit?usp=drive_web)
 
 ---
 
@@ -180,6 +180,12 @@ The device communicates via WebSocket with a mix of JSON control frames and bina
 
 ---
 
+## Build Logbook
+
+The full development process — debugging sessions, design decisions, hardware issues, and architecture evolution — is documented in the [Project Progress + Log Book](https://docs.google.com/document/d/18II7gRaO29cJ0GnAKNLhQsrgbbmvOMZdw-WH79EImz4/edit?usp=drive_web).
+
+---
+
 ## Developer
 
 **Sonu Chowdhury**
@@ -188,3 +194,7 @@ The device communicates via WebSocket with a mix of JSON control frames and bina
 - Email: chowdhurysonu047@gmail.com
 
 ---
+
+## License
+
+ISC
