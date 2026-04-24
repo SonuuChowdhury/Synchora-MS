@@ -74,11 +74,15 @@ server.listen(PORT, async () => {
  showAgentIntro();
   console.log(chalk.blue("ℹ Initializing Agent...\n"));
 
-  connectDB();
+  await connectDB();
   console.log(chalk.green("✔ MongoDB connected"));
 
+  try {
   await redisClient.connect();
   console.log(chalk.green("✔ Redis connected"));
+} catch {
+  console.warn(chalk.yellow("⚠ Redis unavailable, continuing without cache"));
+}
 
   listen(server);
   console.log(chalk.green("✔ Socket service started"));

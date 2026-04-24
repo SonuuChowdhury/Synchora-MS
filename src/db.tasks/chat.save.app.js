@@ -8,6 +8,7 @@ export default async function SaveChat(data) {
     if (!data.role || !data.message) {
       throw new Error("role and message are required");
     }
+
     const chatData = {
       role: data.role,
       message: data.message,
@@ -15,6 +16,7 @@ export default async function SaveChat(data) {
       confidence: data.confidence,
       time: new Date().toISOString()
     };
+
     const updatedDoc = await ChatMemory.findOneAndUpdate(
       {},
       { $push: { chats: chatData } },
@@ -24,12 +26,20 @@ export default async function SaveChat(data) {
         setDefaultsOnInsert: true
       }
     );
-    const recentChats = updatedDoc.chats.slice(-10);
-    await redisClient.setEx(
-      CHAT_CACHE_KEY,
-      600,
-      JSON.stringify(recentChats)
-    );
+
+    // Try to update Redis cache — skip silently if unavailable
+    try {
+      if (redisClient.isReady) {
+        const recentChats = updatedDoc.chats.slice(-10);
+        await redisClient.setEx(
+          CHAT_CACHE_KEY,
+          600,
+          JSON.stringify(recentChats)
+        );
+      }
+    } catch (redisErr) {
+      console.warn("Redis cache update failed:", redisErr.message);
+    }
 
     return { success: true };
 
