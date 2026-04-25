@@ -147,7 +147,7 @@ Server starts on `http://localhost:5000`. WebSocket accepts connections on the s
 ### 4. Tunnel for device access (development)
 
 ```bash
-ngrok http 5000
+ngrok http 5000 --scheme=http
 # Use ws:// (not wss://) URL in ESP32 firmware
 ```
 
