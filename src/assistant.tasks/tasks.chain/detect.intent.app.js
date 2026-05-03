@@ -1,7 +1,7 @@
 import intentPrompt from "../../prompts/detectIntent.prompt.js";
 import dotenv from "dotenv";
 import { RunnableSequence } from "@langchain/core/runnables";
-import GeminiInDetModel from "../../config/geminiDetectionModel.config.js";
+import GeminiMainModel from "../../config/geminiMainModel.config.js";
 import appHandler from "../app.handeller.js";
 import GetChatHistory from "../../db.tasks/chat.get.app.js";
 import chalk from "chalk";
@@ -10,7 +10,7 @@ dotenv.config({ quiet: true });
 
 const intentChain = RunnableSequence.from([
   intentPrompt,
-  GeminiInDetModel
+  GeminiMainModel
 ]);
 
 function cleanJsonOutput(text) {
