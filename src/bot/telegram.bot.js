@@ -50,11 +50,11 @@ For source code and documentation:
 
 SynchoraBot.on("message", async (msg) => {
   if (msg.text.startsWith("/")) return;
-  const chatId = msg.chat.id;
+  const userID = msg.chat.id;
   const text = msg.text;
-  if (chatId.toString() !== userID) {
+  if (userID.toString() !== userID) {
   SynchoraBot.sendMessage(
-    chatId,
+    userID,
     "❌ Unauthorized user.\n\nThis bot is privately configured and cannot be used directly.\n\nIf you want to use it, please deploy your own instance by following the setup instructions in the GitHub repository below:\n\n🔗 https://github.com/SonuuChowdhury/synchora-MS",
     { parse_mode: "HTML" }
   );
@@ -63,9 +63,9 @@ SynchoraBot.on("message", async (msg) => {
   console.log("📌 " + chalk.magenta("User connected via telegram bot: "), text);
   try{
     // -------- START CONTINUOUS TYPING --------
-    await SynchoraBot.sendChatAction(chatId, "typing");
+    await SynchoraBot.sendChatAction(userID, "typing");
     const typingInterval = setInterval(() => {
-      SynchoraBot.sendChatAction(chatId, "typing");
+      SynchoraBot.sendChatAction(userID, "typing");
     }, 4000);
     // ----------------------------------------
     const response = await detectIntent(text, true);
@@ -73,18 +73,38 @@ SynchoraBot.on("message", async (msg) => {
     // -------- STOP TYPING WHEN DONE --------
     if(!response){
       console.error(chalk.magenta("📢 No response generated for the input: " + text));
-      SynchoraBot.sendMessage(chatId, "Sorry, There was an internal agentic error on my system. Please try again later.");
+      SynchoraBot.sendMessage(userID, "Sorry, There was an internal agentic error on my system. Please try again later.");
       return;
     }
     console.log("📌 " + chalk.magenta("Synchora Said:"), response,"\n\n");
     // -------- HTML AUTO-DETECTION --------
     const containsHTML = /<\/?[a-z][\s\S]*>/i.test(response);
     if(containsHTML){
-      SynchoraBot.sendMessage(chatId, response, { parse_mode: "HTML" });
+      SynchoraBot.sendMessage(userID, response, { parse_mode: "HTML" });
     }else{
-      SynchoraBot.sendMessage(chatId, response);
+      SynchoraBot.sendMessage(userID, response);
     }
   } catch (error) {
     console.error("📌 Error while handeling telegram bot:", error);
   }
 });
+
+export async function sendMessageToUser(message) {
+  try {
+    if (!userID) {
+      throw new Error("TELEGRAM_CHAT_ID not defined in .env");
+    }
+    // optional: detect HTML
+    const containsHTML = /<\/?[a-z][\s\S]*>/i.test(message);
+    if (containsHTML) {
+      await SynchoraBot.sendMessage(userID, message, {
+        parse_mode: "HTML",
+      });
+    } else {
+      await SynchoraBot.sendMessage(userID, message);
+    }
+    console.log("📤 Message sent to user:", message);
+  } catch (error) {
+    console.error("❌ Error sending message:", error);
+  }
+}
