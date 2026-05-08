@@ -24,7 +24,9 @@ We do not have any information about the user's last known location.`;
       message += `⚠️ Unable to connect to the device currently.
 Here is the last known data from the user:
 
-🕒 Time: ${new Date(time).toLocaleString()}
+🕒 Time: ${new Date(time).toLocaleString("en-IN", {
+  timeZone: "Asia/Kolkata"
+})}
 🌡️ Temp: ${temperature} °C
 💧 Humidity: ${humidity} %
 📍 Last Known Location:

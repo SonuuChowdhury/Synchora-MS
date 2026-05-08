@@ -5,3 +5,4 @@ src/scripts/test.js
 output.txt
 context.py
 debug_audio
+src/json/geoLocation.json
