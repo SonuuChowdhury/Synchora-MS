@@ -5,24 +5,31 @@ const TELEMETRY_CACHE_KEY = "synchora:telemetry";
 
 export default async function SaveTelemetry(data) {
   try {
+
+    // Fix: use explicit undefined checks instead of falsy checks.
+    // !0.0 === true in JS, which incorrectly rejects valid 0,0 coordinates
+    // (no GPS fix yet) and 0 temperature readings.
     if (
-      data.temperature === undefined ||
-      data.humidity === undefined ||
-      !data.longitude ||
-      !data.latitude
+      data.temperature === undefined || data.temperature === null ||
+      data.humidity    === undefined || data.humidity    === null ||
+      data.longitude   === undefined || data.longitude   === null ||
+      data.latitude    === undefined || data.latitude    === null
     ) {
       throw new Error("temp, humidity, latitude, longitude required");
     }
+
     const telemetryData = {
       temperature: data.temperature,
-      humidity: data.humidity,
-      time: new Date(),
+      humidity:    data.humidity,
+      time:        new Date(),
       location: {
-        type: "Point",
+        type:        "Point",
         coordinates: [data.longitude, data.latitude],
       },
     };
+
     const saved = await Telemetry.create(telemetryData);
+
     try {
       if (redisClient.isReady) {
         const recent = await Telemetry.find()
@@ -38,7 +45,9 @@ export default async function SaveTelemetry(data) {
     } catch (redisErr) {
       console.warn("Redis cache failed:", redisErr.message);
     }
+
     return { success: true, data: saved };
+
   } catch (error) {
     console.error("SaveTelemetry error:", error);
     return { success: false, error: error.message };
