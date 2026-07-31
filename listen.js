@@ -114,6 +114,67 @@ async function handleDirectEmergency(socket) {
 }
 
 // ─────────────────────────────────────────────
+// AUDIO FILE STREAMER (Server-to-Device)
+// Decodes MP3/WAV/audio files to 16kHz 16-bit mono PCM and streams over WebSocket
+// ─────────────────────────────────────────────
+function streamAudioFile(filePath, socket) {
+  if (!fs.existsSync(filePath)) {
+    console.warn("📌 " + chalk.yellow(`[AUDIO] Intro file not found: ${filePath}`));
+    console.warn("📌 " + chalk.gray("       Place 'introduction.mp3' inside Synchora-MS/public/ directory."));
+    return;
+  }
+
+  console.log("📌 " + chalk.cyan("[AUDIO] 🔊 Streaming introduction.mp3 to device..."));
+
+  // Spawn ffmpeg to decode MP3 with real-time pacing (-re), 95% peak capacity limiter, and 16kHz stereo s16le PCM stream
+  const ffmpeg = spawn("ffmpeg", [
+    "-re",
+    "-i", filePath,
+    "-filter:a", "volume=12.0,alimiter=limit=0.95",
+    "-f", "s16le",
+    "-acodec", "pcm_s16le",
+    "-ar", "16000",
+    "-ac", "2",
+    "pipe:1"
+  ]);
+
+  let packetBuffer = Buffer.alloc(0);
+  const PACKET_SIZE = 4096; // 4 KB aggregated packets (~128 ms audio per packet)
+
+  ffmpeg.stdout.on("data", (chunk) => {
+    packetBuffer = Buffer.concat([packetBuffer, chunk]);
+    while (packetBuffer.length >= PACKET_SIZE) {
+      const sendPacket = packetBuffer.subarray(0, PACKET_SIZE);
+      packetBuffer = packetBuffer.subarray(PACKET_SIZE);
+      if (socket.readyState === 1) { // WebSocket.OPEN
+        socket.send(sendPacket);
+      }
+    }
+  });
+
+  ffmpeg.stdout.on("end", () => {
+    if (packetBuffer.length > 0 && socket.readyState === 1) {
+      socket.send(packetBuffer);
+      packetBuffer = Buffer.alloc(0);
+    }
+  });
+
+  ffmpeg.stderr.on("data", () => {}); // silence ffmpeg stderr
+
+  ffmpeg.on("error", (err) => {
+    console.warn("📌 " + chalk.yellow("[AUDIO] ffmpeg spawn failed — sending raw file buffer fallback:"), err.message);
+    try {
+      const rawBuffer = fs.readFileSync(filePath);
+      if (socket.readyState === 1) {
+        socket.send(rawBuffer);
+      }
+    } catch (e) {
+      console.error("📌 " + chalk.red("[AUDIO] Fallback file read failed:"), e.message);
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
 // MAIN WEBSOCKET LISTENER
 // ─────────────────────────────────────────────
 export function listen(server) {
@@ -186,6 +247,13 @@ export function listen(server) {
         console.log(
           "📌 " + chalk.magenta("User identified:") + " " + chalk.cyan(socket.userId)
         );
+        return;
+      }
+
+      // ── Play Intro Audio Request ──
+      if (data.event === "PLAY_INTRO") {
+        const introPath = path.join(process.cwd(), "public", "introduction.mp3");
+        streamAudioFile(introPath, socket);
         return;
       }
 
