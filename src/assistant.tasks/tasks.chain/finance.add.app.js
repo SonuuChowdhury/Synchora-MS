@@ -38,10 +38,11 @@ export default async function financeAddApp(text, intent){
       return;
     }
 
-    const clean = result.content
-    .replace(/```json/g, "")
-    .replace(/```/g, "")
-    .trim();
+    const textToClean = typeof result.content === "string" ? result.content : String(result.content || result || "");
+    const clean = textToClean
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
 
     const parsed = JSON.parse(clean);
 

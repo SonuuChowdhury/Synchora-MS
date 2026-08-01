@@ -1,12 +1,46 @@
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import dotenv from "dotenv";
+import { RunnableLambda } from "@langchain/core/runnables";
+import { createGeminiModel, rotateGeminiKey } from "./geminiRotator.js";
+import chalk from "chalk";
 
-dotenv.config({ quiet: true });
+/**
+ * LangChain-compatible RunnableLambda proxy with auto key rotation on 429 / Quota errors.
+ * This MUST be a RunnableLambda so RunnableSequence can pipe into it correctly.
+ */
+const GeminiMainModelProxy = new RunnableLambda({
+  func: async (promptValue) => {
+    let result;
+    try {
+      const model = createGeminiModel(0);
+      result = await model.invoke(promptValue);
+    } catch (err) {
+      const isQuotaError =
+        err.message?.includes("429") ||
+        err.message?.includes("RESOURCE_EXHAUSTED") ||
+        err.message?.includes("quota") ||
+        err.status === 429;
 
-const GeminiMainModel = new ChatGoogleGenerativeAI({
-  model: "gemini-2.5-flash",
-  temperature: 0,
-  apiKey: process.env.GEMINI_API_KEY,
+      if (isQuotaError) {
+        rotateGeminiKey("Rate limit / Quota exceeded");
+        console.log(chalk.yellow("📌 [GEMINI] 🔄 Retrying with rotated API key..."));
+        const newModel = createGeminiModel(0);
+        result = await newModel.invoke(promptValue);
+      } else {
+        throw err;
+      }
+    }
+
+    // Normalize output to always return a plain { content: string } object
+    if (typeof result === "string") {
+      return { content: result };
+    }
+    if (result && typeof result.content === "string") {
+      return result;
+    }
+    if (result && Array.isArray(result.content)) {
+      return { content: result.content.map((c) => c.text || String(c)).join("") };
+    }
+    return { content: String(result || "") };
+  }
 });
 
-export default GeminiMainModel;
+export default GeminiMainModelProxy;

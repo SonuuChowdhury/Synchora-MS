@@ -38,7 +38,8 @@ export default async function financeQueryApp(text, intent){
       return;
     }
 
-    const clean = result.content
+    const textToClean = typeof result.content === "string" ? result.content : String(result.content || result || "");
+    const clean = textToClean
       .replace(/```json\s*/gi, "")
       .replace(/```\s*/g, "")
       .trim();

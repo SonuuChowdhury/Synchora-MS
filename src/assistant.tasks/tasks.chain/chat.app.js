@@ -47,20 +47,34 @@ export default async function chatApp(text, intent) {
       modelData: modelData
     });
 
-    // console.log("input: " , text, "intent: ", intent, "userData: ", userData, "chatHistory: ", chatHistory, "modelData: ", modelData); // Log to check what data going to Model
+    let rawContent = "";
+    if (typeof result === "string") {
+      rawContent = result;
+    } else if (result && typeof result.content === "string") {
+      rawContent = result.content;
+    } else if (result && Array.isArray(result.content)) {
+      rawContent = result.content.map((c) => c.text || c).join("");
+    } else if (result && typeof result.text === "string") {
+      rawContent = result.text;
+    }
 
-    if (!result?.content) {
+    if (!rawContent) {
       console.error("No content generated from chat model");
       return "Sorry, I couldn't respond right now.";
     }
 
-    let parsedChat;
-
+    let parsedChat = null;
     try {
-      parsedChat = JSON.parse(result.content);
+      const cleanJson = rawContent
+        .replace(/```json\s*/gi, "")
+        .replace(/```\s*/g, "")
+        .trim();
+      parsedChat = JSON.parse(cleanJson);
     } catch (err) {
-      console.error("Invalid JSON from model:", result.content);
-      return "Sorry, something went wrong.";
+      // LLM returned natural conversational text instead of JSON
+      parsedChat = {
+        chat: { role: "assistant", message: rawContent.replace(/```/g, "").trim() }
+      };
     }
 
     // Save user message
@@ -72,14 +86,16 @@ export default async function chatApp(text, intent) {
     });
 
     // Save assistant message
-    await SaveChat(parsedChat.chat);
+    if (parsedChat?.chat) {
+      await SaveChat(parsedChat.chat);
+    }
 
     // Save user memory if needed
-    if (parsedChat.update_user && parsedChat.user_update_data) {
+    if (parsedChat?.update_user && parsedChat?.user_update_data) {
       await SaveUser(parsedChat.user_update_data);
     }
 
-    return parsedChat.chat?.message || "Sorry, I couldn't respond.";
+    return parsedChat?.chat?.message || rawContent || "Sorry, I couldn't respond right now.";
 
   } catch (error) {
     console.error("Chat processing failed:", error.message);

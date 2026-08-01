@@ -3,6 +3,8 @@ import { spawn } from "child_process";
 import detectIntent from "./src/assistant.tasks/tasks.chain/detect.intent.app.js";
 import emergencyProtocol from "./src/assistant.tasks/tasks.chain/emergency.protocol.js";
 import SaveTelemetry from "./src/db.tasks/telemetry.data.save.js";
+import { transcribeWithGroq } from "./src/stt/groqStt.js";
+import { generateEdgeTTS } from "./src/tts/edgeTts.js";
 import dotenv from "dotenv";
 import chalk from "chalk";
 import fs from "fs";
@@ -126,11 +128,11 @@ function streamAudioFile(filePath, socket) {
 
   console.log("📌 " + chalk.cyan("[AUDIO] 🔊 Streaming introduction.mp3 to device..."));
 
-  // Spawn ffmpeg to decode MP3 with real-time pacing (-re), 95% peak capacity limiter, and 16kHz stereo s16le PCM stream
+  // Spawn ffmpeg to decode MP3 with real-time pacing (-re), +80% volume boost, and 16kHz stereo s16le PCM stream
   const ffmpeg = spawn("ffmpeg", [
     "-re",
     "-i", filePath,
-    "-filter:a", "volume=12.0,alimiter=limit=0.95",
+    "-filter:a", "volume=1.8",
     "-f", "s16le",
     "-acodec", "pcm_s16le",
     "-ar", "16000",
@@ -139,16 +141,26 @@ function streamAudioFile(filePath, socket) {
   ]);
 
   let packetBuffer = Buffer.alloc(0);
-  const PACKET_SIZE = 4096; // 4 KB aggregated packets (~128 ms audio per packet)
+  const PACKET_SIZE = 1024; // 1 KB clean packets (16 ms audio per packet — prevents ESP32 RX buffer overflow & WDT resets)
 
   ffmpeg.stdout.on("data", (chunk) => {
     packetBuffer = Buffer.concat([packetBuffer, chunk]);
+
     while (packetBuffer.length >= PACKET_SIZE) {
+      if (!socket || socket.readyState !== 1) break; // Stop if socket closed
+
+      // Network backpressure protection — pause ffmpeg if network buffer fills up
+      if (socket.bufferedAmount > 32 * 1024) {
+        ffmpeg.stdout.pause();
+        setTimeout(() => {
+          if (ffmpeg.stdout) ffmpeg.stdout.resume();
+        }, 20);
+        break;
+      }
+
       const sendPacket = packetBuffer.subarray(0, PACKET_SIZE);
       packetBuffer = packetBuffer.subarray(PACKET_SIZE);
-      if (socket.readyState === 1) { // WebSocket.OPEN
-        socket.send(sendPacket);
-      }
+      socket.send(sendPacket);
     }
   });
 
@@ -189,9 +201,65 @@ export function listen(server) {
     let recording = false;
     let audioBuffer = Buffer.alloc(0);
     let timer = null;
+    let laptopMicProc = null;
+
+    const startLaptopMic = () => {
+      if (laptopMicProc) {
+        try { laptopMicProc.kill("SIGKILL"); } catch(e){}
+        laptopMicProc = null;
+      }
+
+      console.log(
+        "📌 " +
+          chalk.yellow(
+            "🎙️ [SERVER] ESP32 Mic disabled (MIC_AVAILABLE=false). Recording audio from Laptop Microphone..."
+          )
+      );
+
+      laptopMicProc = spawn("ffmpeg", [
+        "-y",
+        "-f", "dshow",
+        "-i", "audio=Microphone Array (Realtek High Definition Audio)",
+        "-f", "s16le",
+        "-acodec", "pcm_s16le",
+        "-ar", "16000",
+        "-ac", "1",
+        "pipe:1"
+      ]);
+
+      laptopMicProc.stdout.on("data", (chunk) => {
+        audioBuffer = Buffer.concat([audioBuffer, chunk]);
+      });
+
+      laptopMicProc.on("error", (err) => {
+        console.warn("📌 " + chalk.yellow("[LAPTOP MIC] ffmpeg device spawn failed — trying default dshow device:"), err.message);
+        laptopMicProc = spawn("ffmpeg", [
+          "-y",
+          "-f", "dshow",
+          "-i", "audio=default",
+          "-f", "s16le",
+          "-acodec", "pcm_s16le",
+          "-ar", "16000",
+          "-ac", "1",
+          "pipe:1"
+        ]);
+        laptopMicProc.stdout.on("data", (chunk) => {
+          audioBuffer = Buffer.concat([audioBuffer, chunk]);
+        });
+      });
+    };
+
+    const stopLaptopMic = () => {
+      if (laptopMicProc) {
+        try { laptopMicProc.kill("SIGINT"); } catch(e){}
+        laptopMicProc = null;
+        console.log("📌 " + chalk.yellow("🎙️ [SERVER] Laptop Microphone recording stopped."));
+      }
+    };
 
     const reset = () => {
       recording = false;
+      stopLaptopMic();
       audioBuffer = Buffer.alloc(0);
       if (timer) clearTimeout(timer);
       timer = null;
@@ -200,6 +268,7 @@ export function listen(server) {
     const endCommand = (reason) => {
       if (!recording) return;
       recording = false;
+      stopLaptopMic();
       if (timer) clearTimeout(timer);
 
       console.log("📌 " + chalk.magenta("Command ended: ") + reason);
@@ -252,8 +321,22 @@ export function listen(server) {
 
       // ── Play Intro Audio Request ──
       if (data.event === "PLAY_INTRO") {
-        const introPath = path.join(process.cwd(), "public", "introduction.mp3");
-        streamAudioFile(introPath, socket);
+        const hour = new Date().getHours();
+        let greeting = "Good evening";
+        if (hour >= 4 && hour < 12) {
+          greeting = "Good morning";
+        } else if (hour >= 12 && hour < 17) {
+          greeting = "Good afternoon";
+        }
+        const introText = `${greeting}, Synchora is now ready. How may I help you today?`;
+        console.log("📌 " + chalk.cyan(`[PLAY_INTRO] Generating greeting TTS: "${introText}"`));
+        try {
+          await runTTS(introText, socket);
+        } catch (err) {
+          console.warn("📌 " + chalk.yellow("[PLAY_INTRO] TTS greeting failed — falling back to static introduction.mp3:"), err.message);
+          const introPath = path.join(process.cwd(), "public", "introduction.mp3");
+          streamAudioFile(introPath, socket);
+        }
         return;
       }
 
@@ -262,6 +345,11 @@ export function listen(server) {
         reset();
         recording = true;
         console.log("📌 " + chalk.magenta("Recording started"));
+
+        if (process.env.MIC_AVAILABLE === "false") {
+          startLaptopMic();
+        }
+
         timer = setTimeout(() => {
           endCommand("timeout");
         }, MAX_SEC * 1000);
@@ -270,6 +358,9 @@ export function listen(server) {
 
       // ── Voice recording end ──
       if (data.event === "END") {
+        if (process.env.MIC_AVAILABLE === "false") {
+          stopLaptopMic();
+        }
         endCommand("button_release");
         return;
       }
@@ -324,7 +415,7 @@ export async function DetectIntentOfText(text, socket) {
       return;
     }
     console.log("📌 " + chalk.magenta("Synchora Said:"), result, "\n\n");
-    // runTTS(result, socket);
+    runTTS(result, socket);
   } catch (err) {
     console.error("Error in starting the intent detection process:", err);
   }
@@ -362,6 +453,33 @@ async function runSTT(pcmBuffer, socket) {
   console.log(`📌 [STT] Buffer size: ${pcmBuffer.length} bytes`);
   console.log(`📌 [STT] Socket userId: ${socket.userId}`);
 
+  // Validate Token before processing
+  const valid = ValidateToken(socket.userId);
+  if (!valid) {
+    console.log("❌ [STT] Invalid token or unauthorized user, userId:", socket.userId);
+    socket.send("❌ Unauthorized device token");
+    return;
+  }
+
+  // ⚡ TASK 2: Groq Whisper API (Fast ~150ms Speech Recognition)
+  if (process.env.GROQ_API_KEY) {
+    try {
+      console.log("📌 " + chalk.cyan("[STT] ⚡ Transcribing with Groq Whisper API (whisper-large-v3-turbo)..."));
+      const text = await transcribeWithGroq(pcmBuffer);
+      console.log(`📌 [STT] ✅ Recognized text: "${text}"`);
+      if (text) {
+        DetectIntentOfText(text, socket);
+      } else {
+        console.warn("📌 [STT] ⚠️ Empty speech recognized.");
+        socket.send("📌 Speech not understood");
+      }
+      return;
+    } catch (err) {
+      console.warn("📌 " + chalk.yellow("[STT] Groq STT failed — falling back to Python STT script:"), err.message);
+    }
+  }
+
+  // Fallback: Python STT process
   const py = spawn("python", ["src/stt/stt.py"], {
     stdio: ["pipe", "pipe", "pipe"],
   });
@@ -400,24 +518,11 @@ async function runSTT(pcmBuffer, socket) {
       const result = JSON.parse(output);
       console.log("📌 [STT] Parsed result:", result);
 
-      if (result) {
-        const valid = ValidateToken(socket.userId);
-        console.log(`📌 [STT] Token valid: ${valid}, userId: ${socket.userId}`);
-
-        if (!valid) {
-          console.log("❌ [STT] Invalid token, userId:", socket.userId);
-        }
-
-        if (valid && result.success) {
-          console.log(`📌 [STT] Recognized text: "${result.text}"`);
-          DetectIntentOfText(result.text, socket);
-        } else if (valid && !result.success) {
-          console.log(`❌ [STT] STT failed: ${result.error}`);
-        } else {
-          console.log("❌ [STT] Invalid command or missing user token");
-        }
-      } else {
-        console.log("❌ [STT] Null result from STT");
+      if (result && result.success) {
+        console.log(`📌 [STT] Recognized text: "${result.text}"`);
+        DetectIntentOfText(result.text, socket);
+      } else if (result && !result.success) {
+        console.log(`❌ [STT] STT failed: ${result.error}`);
       }
     } catch (e) {
       console.error("❌ [STT] JSON parse error:", e.message);
@@ -434,25 +539,35 @@ async function runSTT(pcmBuffer, socket) {
 }
 
 // ─────────────────────────────────────────────
-// TTS PIPELINE
+// TTS PIPELINE (Microsoft Edge Neural TTS — 100% Free, Zero Noise, High Speed)
 // ─────────────────────────────────────────────
-export function runTTS(text, socket) {
-  const py = spawn("python", ["src/tts/tts.py"], {
-    stdio: ["pipe", "pipe", "pipe"],
-  });
+export async function runTTS(text, socket) {
+  if (!text) return;
+  console.log("📌 " + chalk.cyan("[TTS] ⚡ Synthesizing response with Microsoft Edge Neural TTS (Free & Unlimited)..."));
+  
+  // Notify device that TTS speech response stream is starting
+  if (socket && socket.readyState === 1) {
+    socket.send(JSON.stringify({ event: "TTS_START", text: text }));
+  }
 
-  py.stdin.write(text);
-  py.stdin.end();
+  try {
+    const voice = process.env.TTS_VOICE || "en-IN-NeerjaNeural";
+    const mp3Path = await generateEdgeTTS(text, voice);
+    streamAudioFile(mp3Path, socket);
 
-  py.stdout.on("data", (chunk) => {
-    socket.send(chunk, { binary: true });
-  });
-
-  py.stderr.on("data", (err) => {
-    console.error("TTS ERR:", err.toString());
-  });
-
-  py.on("close", () => {
-    socket.send(JSON.stringify({ event: "TTS_END" }));
-  });
+    // Clean up temporary MP3 file after streaming completes
+    setTimeout(() => {
+      try {
+        if (fs.existsSync(mp3Path)) fs.unlinkSync(mp3Path);
+      } catch (e) {}
+      if (socket && socket.readyState === 1) {
+        socket.send(JSON.stringify({ event: "TTS_END", success: true }));
+      }
+    }, 12000);
+  } catch (err) {
+    console.error("📌 ❌ [TTS] Edge-TTS synthesis error:", err.message);
+    if (socket && socket.readyState === 1) {
+      socket.send(JSON.stringify({ event: "TTS_END", success: false }));
+    }
+  }
 }

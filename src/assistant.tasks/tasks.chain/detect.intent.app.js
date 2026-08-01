@@ -13,11 +13,26 @@ const intentChain = RunnableSequence.from([
   GeminiMainModel
 ]);
 
-function cleanJsonOutput(text) {
-  return text
-    .replace(/```json/gi, "")
-    .replace(/```/g, "")
-    .trim();
+function cleanAndExtractJson(text) {
+  let rawStr = "";
+  if (typeof text !== "string") {
+    if (text && typeof text.content === "string") {
+      rawStr = text.content;
+    } else if (text && Array.isArray(text.content)) {
+      rawStr = text.content.map((c) => c.text || c).join("");
+    } else {
+      rawStr = String(text || "");
+    }
+  } else {
+    rawStr = text;
+  }
+
+  let clean = rawStr.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+  const jsonMatch = clean.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    clean = jsonMatch[0];
+  }
+  return clean;
 }
 
 export default async function detectIntent(text, isTelegramClient = false) {
@@ -29,11 +44,17 @@ export default async function detectIntent(text, isTelegramClient = false) {
     const chatHistory = await GetChatHistory();
     const result = await intentChain.invoke({ input: text, chatHistory });
 
-    const clean = cleanJsonOutput(result.content);
-    const parsed = JSON.parse(clean);
+    const clean = cleanAndExtractJson(result);
+    let parsed;
+    try {
+      parsed = JSON.parse(clean);
+    } catch (parseErr) {
+      console.warn("📌 ⚠️ [INTENT] JSON parsing failed — falling back to 'chat' intent.");
+      parsed = { intent: "chat", confidence: 0.95 };
+    }
 
     if (!parsed.intent || typeof parsed.confidence !== "number") {
-      throw new Error("Invalid intent response format");
+      parsed = { intent: "chat", confidence: 0.95 };
     }
 
     console.log("📌 " + chalk.magenta("Intent:"), parsed.intent, "Confidence:", parsed.confidence);
