@@ -1,110 +1,111 @@
 import SynchoraBot from "../config/bot.config.js";
 import detectIntent from "../assistant.tasks/tasks.chain/detect.intent.app.js";
-import chalk from "chalk";
+import createLogger from "../utils/logger.js";
 
-import dotenv from "dotenv";
-dotenv.config({ quiet: true });
-
-const userID =  process.env.TELEGRAM_CHAT_ID;
+const log = createLogger("TELEGRAM");
+const configuredChatID = process.env.TELEGRAM_CHAT_ID;
 
 SynchoraBot.onText(/\/start/, (msg) => {
-  SynchoraBot.sendMessage(msg.chat.id,
-`👋 Welcome to *Synchora*
+  SynchoraBot.sendMessage(
+    msg.chat.id,
+    `Welcome to Synchora
 
 Synchora is an AI assistant designed to work with the Synchora wearable band, helping users manage daily activities through voice commands and intelligent assistance.
 
-But the bot you are interacting is build for the purpose of communicating synchora's assistive agent via telegram.
+This bot allows direct messaging to Synchora's assistive agent via Telegram.
 
 Use the commands below to explore:
 • /info — Learn more about the project
 
-Created by *Sonu Chowdhury*  
-🔗 GitHub: https://github.com/SonuuChowdhury 
-🌐 Portfolio: https://portfolio-sonuuchowdhury.vercel.app`,
-{ parse_mode: "Markdown" });
+Created by Sonu Chowdhury  
+GitHub: https://github.com/SonuuChowdhury 
+Portfolio: https://portfolio-sonuuchowdhury.vercel.app`,
+    { parse_mode: "Markdown" }
+  );
 });
 
 SynchoraBot.onText(/\/info/, (msg) => {
-  SynchoraBot.sendMessage(msg.chat.id,
-`ℹ️ *Synchora Project Information*
+  SynchoraBot.sendMessage(
+    msg.chat.id,
+    `Synchora Project Information
 
 Synchora is an AI agent designed to assist users with daily tasks and activities through voice commands or text-based interactions.
 
-*Core Capabilities*
+Core Capabilities:
 • Voice command recognition  
 • Task and reminder management  
 • Calendar synchronization  
 • Accessibility-focused interaction for users with special needs  
 • Smart assistance for daily activities
-• And many more features in development!
 
-*Developer*
+Developer:
 • Sonu Chowdhury — Project Lead & System Developer   
 
-For source code and documentation:
-
-🔗 GitHub: https://github.com/SonuuChowdhury 
-🌐 Portfolio: https://portfolio-sonuuchowdhury.vercel.app`,
-{ parse_mode: "Markdown" });
+GitHub: https://github.com/SonuuChowdhury 
+Portfolio: https://portfolio-sonuuchowdhury.vercel.app`,
+    { parse_mode: "Markdown" }
+  );
 });
 
 SynchoraBot.on("message", async (msg) => {
-  if (msg.text.startsWith("/")) return;
-  const userID = msg.chat.id;
+  if (!msg.text || msg.text.startsWith("/")) return;
+  const chatID = msg.chat.id;
   const text = msg.text;
-  if (userID.toString() !== userID) {
-  SynchoraBot.sendMessage(
-    userID,
-    "❌ Unauthorized user.\n\nThis bot is privately configured and cannot be used directly.\n\nIf you want to use it, please deploy your own instance by following the setup instructions in the GitHub repository below:\n\n🔗 https://github.com/SonuuChowdhury/synchora-MS",
-    { parse_mode: "HTML" }
-  );
-  return;
-}
-  console.log("📌 " + chalk.magenta("User connected via telegram bot: "), text);
-  try{
-    // -------- START CONTINUOUS TYPING --------
-    await SynchoraBot.sendChatAction(userID, "typing");
+
+  if (configuredChatID && chatID.toString() !== configuredChatID.toString()) {
+    log.warn(`Unauthorized Telegram message from chat ID ${chatID}`);
+    SynchoraBot.sendMessage(
+      chatID,
+      "Unauthorized user.\n\nThis bot is privately configured and cannot be used directly.\n\nSetup instructions available at:\nhttps://github.com/SonuuChowdhury/synchora-MS",
+      { parse_mode: "HTML" }
+    );
+    return;
+  }
+
+  log.info(`Telegram message received: "${text}"`);
+  try {
+    await SynchoraBot.sendChatAction(chatID, "typing");
     const typingInterval = setInterval(() => {
-      SynchoraBot.sendChatAction(userID, "typing");
+      SynchoraBot.sendChatAction(chatID, "typing");
     }, 4000);
-    // ----------------------------------------
+
     const response = await detectIntent(text, true);
     clearInterval(typingInterval);
-    // -------- STOP TYPING WHEN DONE --------
-    if(!response){
-      console.error(chalk.magenta("📢 No response generated for the input: " + text));
-      SynchoraBot.sendMessage(userID, "Sorry, There was an internal agentic error on my system. Please try again later.");
+
+    if (!response) {
+      log.error(`No response generated for input: "${text}"`);
+      SynchoraBot.sendMessage(
+        chatID,
+        "Sorry, an internal error occurred on the system. Please try again later."
+      );
       return;
     }
-    console.log("📌 " + chalk.magenta("Synchora Said:"), response,"\n\n");
-    // -------- HTML AUTO-DETECTION --------
+
+    log.info(`Telegram response sent: "${response}"`);
     const containsHTML = /<\/?[a-z][\s\S]*>/i.test(response);
-    if(containsHTML){
-      SynchoraBot.sendMessage(userID, response, { parse_mode: "HTML" });
-    }else{
-      SynchoraBot.sendMessage(userID, response);
+    if (containsHTML) {
+      SynchoraBot.sendMessage(chatID, response, { parse_mode: "HTML" });
+    } else {
+      SynchoraBot.sendMessage(chatID, response);
     }
   } catch (error) {
-    console.error("📌 Error while handeling telegram bot:", error);
+    log.error("Error handling Telegram bot message:", error.message);
   }
 });
 
 export async function sendMessageToUser(message) {
   try {
-    if (!userID) {
-      throw new Error("TELEGRAM_CHAT_ID not defined in .env");
+    if (!configuredChatID) {
+      throw new Error("TELEGRAM_CHAT_ID not defined in environment variables");
     }
-    // optional: detect HTML
     const containsHTML = /<\/?[a-z][\s\S]*>/i.test(message);
     if (containsHTML) {
-      await SynchoraBot.sendMessage(userID, message, {
-        parse_mode: "HTML",
-      });
+      await SynchoraBot.sendMessage(configuredChatID, message, { parse_mode: "HTML" });
     } else {
-      await SynchoraBot.sendMessage(userID, message);
+      await SynchoraBot.sendMessage(configuredChatID, message);
     }
-    console.log("📤 Message sent to user:", message);
+    log.info(`Message dispatched to Telegram user: "${message}"`);
   } catch (error) {
-    console.error("❌ Error sending message:", error);
+    log.error("Error sending Telegram message:", error.message);
   }
 }

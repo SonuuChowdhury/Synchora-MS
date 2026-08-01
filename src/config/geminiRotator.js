@@ -1,10 +1,14 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import chalk from "chalk";
+import createLogger from "../utils/logger.js";
 import dotenv from "dotenv";
 
-dotenv.config({ quiet: true });
+const log = createLogger("GEMINI_ROTATOR");
+
+let geminiKeys = null;
+let currentKeyIndex = 0;
 
 function loadKeys() {
+  dotenv.config({ quiet: true });
   const collectedKeys = [];
 
   // 1. Parse comma/newline/space separated strings in GEMINI_API_KEYS or GEMINI_API_KEY
@@ -41,42 +45,36 @@ function loadKeys() {
   const keys = Array.from(new Set(collectedKeys));
 
   if (keys.length === 0) {
-    console.error(chalk.red("❌ [GEMINI ROTATOR] No Gemini API keys found in .env!"));
+    log.error("No Gemini API keys found in environment variables");
   } else {
-    console.log(
-      chalk.cyan(
-        `📌 [GEMINI ROTATOR] Loaded ${keys.length} Gemini API Key(s) into active rotation pool.`
-      )
-    );
+    log.info(`Loaded ${keys.length} Gemini API key(s) into active rotation pool`);
   }
   return keys;
 }
 
-const geminiKeys = loadKeys();
-let currentKeyIndex = 0;
+function ensureKeysLoaded() {
+  if (!geminiKeys) {
+    geminiKeys = loadKeys();
+  }
+  return geminiKeys;
+}
 
 export function getActiveGeminiKey() {
-  if (geminiKeys.length === 0) return "";
-  return geminiKeys[currentKeyIndex];
+  const keys = ensureKeysLoaded();
+  if (keys.length === 0) return "";
+  return keys[currentKeyIndex];
 }
 
 export function rotateGeminiKey(reason = "Rate limit / Quota limit hit") {
-  if (geminiKeys.length <= 1) {
-    console.warn(
-      chalk.yellow(
-        `⚠️ [GEMINI ROTATOR] Only ${geminiKeys.length} key in pool — cannot rotate.`
-      )
-    );
+  const keys = ensureKeysLoaded();
+  if (keys.length <= 1) {
+    log.warn(`Only ${keys.length} key in pool — cannot rotate`);
     return getActiveGeminiKey();
   }
 
   const oldIndex = currentKeyIndex;
-  currentKeyIndex = (currentKeyIndex + 1) % geminiKeys.length;
-  console.log(
-    chalk.bgYellow.black.bold(
-      ` 🔄 [GEMINI ROTATOR] ${reason} on Key #${oldIndex + 1}! Rotating to Key #${currentKeyIndex + 1}... `
-    )
-  );
+  currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+  log.warn(`${reason} on Key #${oldIndex + 1}. Rotating to Key #${currentKeyIndex + 1}`);
   return getActiveGeminiKey();
 }
 
@@ -86,5 +84,7 @@ export function createGeminiModel(temperature = 0) {
     model: "gemini-2.5-flash",
     temperature: temperature,
     apiKey: apiKey,
+    maxRetries: 0,
+    timeout: 10000,
   });
 }

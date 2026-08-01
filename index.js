@@ -1,6 +1,6 @@
+import "dotenv/config";
 import express from "express";
 import http from "http";
-import dotenv from "dotenv";
 import cors from "cors";
 import morgan from "morgan";
 import figlet from "figlet";
@@ -8,16 +8,18 @@ import chalk from "chalk";
 import boxen from "boxen";
 
 import { errorHandler } from "./src/middlewares/error.middleware.js";
-import {listen} from "./listen.js";
+import { listen } from "./listen.js";
 import router from "./src/routes/routes.js";
 import connectDB from "./src/db/mongoose.connect.db.js";
 import './src/bot/telegram.bot.js';
 import redisClient from "./src/config/redis.config.js";
 
-dotenv.config({ quiet: true });
+import createLogger from "./src/utils/logger.js";
+
+const log = createLogger("SERVER");
+
 const app = express();
 const server = http.createServer(app);
-
 
 /* ===============================
    GLOBAL MIDDLEWARES
@@ -27,7 +29,6 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
 app.use("/", router);
-
 
 /* ===============================
    ERROR HANDLER
@@ -40,24 +41,22 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 function showAgentIntro() {
-
   const logo = chalk.cyan(
     figlet.textSync("Synchora", { horizontalLayout: "default" })
   );
-
   console.log(logo);
 
   const info = `
 ${chalk.bold("AI Automation Agent")}
 
-${chalk.green("Status")}                : Running
-${chalk.magenta("GitHub Repository")}     : https://github.com/SonuuChowdhury/Synchora-MS
-${chalk.yellow("Web Site")}              : https://synchora-seven.vercel.app
-${chalk.cyan("Developer")}             : Sonu Chowdhury
-${chalk.cyan("Developer Portfolio")}   : https://portfolio-sonuuchowdhury.vercel.app
-${chalk.cyan("Support")}               : chowdhurysonu047@gmail.com
+Status                : Running
+GitHub Repository     : https://github.com/SonuuChowdhury/Synchora-MS
+Web Site              : https://synchora-seven.vercel.app
+Developer             : Sonu Chowdhury
+Developer Portfolio   : https://portfolio-sonuuchowdhury.vercel.app
+Support               : chowdhurysonu047@gmail.com
 
-${chalk.gray("Synchora automates workflows, scraping, and intelligent task orchestration.")}
+Synchora automates workflows, scraping, and intelligent task orchestration.
 `;
 
   console.log(
@@ -71,23 +70,20 @@ ${chalk.gray("Synchora automates workflows, scraping, and intelligent task orche
 }
 
 server.listen(PORT, async () => {
- showAgentIntro();
-  console.log(chalk.blue("ℹ Initializing Agent...\n"));
+  showAgentIntro();
+  log.info("Initializing Agent server...");
 
   await connectDB();
-  console.log(chalk.green("✔ MongoDB connected"));
+  log.info("MongoDB connected successfully");
 
   try {
-  await redisClient.connect();
-  console.log(chalk.green("✔ Redis connected"));
-} catch {
-  console.warn(chalk.yellow("⚠ Redis unavailable, continuing without cache"));
-}
+    await redisClient.connect();
+    log.info("Redis connected successfully");
+  } catch {
+    log.warn("Redis unavailable, continuing without cache");
+  }
 
   listen(server);
-  console.log(chalk.green("✔ Socket service started"));
-
-  console.log(
-    chalk.yellow(`🚀 Server running at http://localhost:${PORT}\n`)
-  );
+  log.info("WebSocket listener service started");
+  log.info(`Server running at http://localhost:${PORT}`);
 });
