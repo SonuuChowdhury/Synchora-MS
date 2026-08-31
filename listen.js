@@ -131,20 +131,24 @@ function streamAudioFile(filePath, socket) {
     log.info(`Streaming audio file to device: ${path.basename(filePath)}`);
 
     const ffmpeg = spawn("ffmpeg", [
-      "-re",
+      // NOTE: No -re flag here — stream as fast as possible so the ESP32
+      // jitter buffer fills immediately. The ESP32 ring buffer controls
+      // playback pacing; real-time throttling on the server causes starvation.
       "-i", filePath,
-      "-filter:a", "volume=1.8",
+      "-filter:a", "volume=0.75",  // Cap at 0.75 to protect 0.25W/16Ω speakers at +9dB GAIN
       "-f", "s16le",
       "-acodec", "pcm_s16le",
       "-ar", "16000",
-      "-ac", "2",
+      "-ac", "1",  // MONO — matches MAX98357A mono amp; halves Wi-Fi bandwidth vs stereo
       "pipe:1"
     ]);
 
     let packetBuffer = Buffer.alloc(0);
     let totalBytesSent = 0;
     let resolved = false;
-    const PACKET_SIZE = 1024;
+    // 4096-byte packets: reduces WebSocket frame count from 31/sec to 8/sec,
+    // dramatically cutting TCP header overhead and burst-drop patterns on weak Wi-Fi.
+    const PACKET_SIZE = 4096;
 
     const finish = () => {
       if (resolved) return;
@@ -163,7 +167,7 @@ function streamAudioFile(filePath, socket) {
       while (packetBuffer.length >= PACKET_SIZE) {
         if (!socket || socket.readyState !== 1) break;
 
-        if (socket.bufferedAmount > 32 * 1024) {
+        if (socket.bufferedAmount > 16 * 1024) {
           ffmpeg.stdout.pause();
           setTimeout(() => {
             if (ffmpeg.stdout) ffmpeg.stdout.resume();
@@ -201,11 +205,17 @@ function streamAudioFile(filePath, socket) {
 // ─────────────────────────────────────────────
 // MAIN WEBSOCKET LISTENER
 // ─────────────────────────────────────────────
+
+// Tracks the most recently connected device socket (for reminder TTS)
+let activeSocket = null;
+export function getActiveSocket() { return activeSocket; }
+
 export function listen(server) {
   const wss = new WebSocketServer({ server });
 
   wss.on("connection", (socket) => {
     log.info("Client connected via WebSocket protocol");
+    activeSocket = socket;
 
     let recording = false;
     let audioBuffer = Buffer.alloc(0);
@@ -386,6 +396,7 @@ export function listen(server) {
 
     socket.on("close", () => {
       log.info("Client WebSocket disconnected");
+      if (activeSocket === socket) activeSocket = null;
       stopEmergencyLoop(socket);
       endCommand("disconnect");
     });
@@ -403,7 +414,10 @@ export async function DetectIntentOfText(text, socket) {
 
     if (fillerPhrase) {
       log.info(`STT Recognized: "${text}" (rough intent: ${roughIntent}) -> Triggering filler: "${fillerPhrase}"`);
-      runTTS(fillerPhrase, socket);
+      // MUST await here — without await, filler TTS and the main AI response TTS
+      // both fire concurrently, sending two TTS_START events to the device and
+      // racing two audio streams into the same ring buffer, causing garbled audio.
+      await runTTS(fillerPhrase, socket);
     } else {
       log.info(`STT Recognized greeting/simple input: "${text}" -> Skipping filler, direct response`);
     }
@@ -543,9 +557,14 @@ export async function runTTS(text, socket) {
     const mp3Path = await generateEdgeTTS(text, voice);
     const bytesSent = await streamAudioFile(mp3Path, socket);
 
-    // Calculate accurate duration from byte count (16kHz 16-bit 2-channel PCM = 64,000 bytes/sec)
-    const estimatedDurationMs = Math.ceil((bytesSent / 64000) * 1000) + TTS_END_BUFFER_MS;
-    const finalTimerMs = Math.max(estimatedDurationMs, 500);
+    // Calculate playback duration from byte count.
+    // Mono PCM @ 16kHz 16-bit = 16000 × 2 = 32,000 bytes/sec.
+    // (Previously used 64000 which was the stereo rate — caused TTS_END to fire
+    // at half the correct time, cutting off the last word of every sentence.)
+    // Add TTS_END_BUFFER_MS PLUS an extra 400ms drain window so the ESP32 jitter
+    // buffer fully drains before setPlaybackActive(false) is called.
+    const estimatedDurationMs = Math.ceil((bytesSent / 32000) * 1000) + TTS_END_BUFFER_MS + 400;
+    const finalTimerMs = Math.max(estimatedDurationMs, 800);
 
     await new Promise((resolve) => {
       setTimeout(() => {
