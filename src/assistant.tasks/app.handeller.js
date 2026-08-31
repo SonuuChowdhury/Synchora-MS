@@ -1,5 +1,6 @@
 import { researchAgent } from "./task.graph/autonomous.research.agent.js";
 import emergencyProtocol from "./tasks.chain/emergency.protocol.js";
+import GetLatestTelemetry from "../db.tasks/telemetry.data.get.js";
 import createLogger from "../utils/logger.js";
 
 const log = createLogger("HANDLER");
@@ -18,6 +19,8 @@ export default async function appHandler(text, parsedIntent, isTelegramClient) {
     try {
       const researchRes = await researchAgent.invoke({
         userQuery: text,
+        augmentedQuery: text,      // seed first search with raw user query
+        mustSearch: true,           // force at least one real web search
         intent: intentStr,
         confidence: parsedIntent.confidence || 0.9,
         allowHTML: isTelegramClient
@@ -27,6 +30,34 @@ export default async function appHandler(text, parsedIntent, isTelegramClient) {
       log.error("Research agent invocation failed:", err.message);
       return "I ran into an issue searching for that.";
     }
+  }
+
+  // Weather Query -> Read live sensor telemetry
+  if (intentStr === "weather_query") {
+    try {
+      const telemetry = await GetLatestTelemetry();
+      if (!telemetry) {
+        return "I don't have sensor data right now. The device may not be connected.";
+      }
+      const temp = telemetry.temperature;
+      const humidity = telemetry.humidity;
+      let feel = "comfortable";
+      if (temp >= 38) feel = "very hot";
+      else if (temp >= 32) feel = "quite warm";
+      else if (temp >= 27) feel = "warm";
+      else if (temp <= 18) feel = "cool";
+
+      const humidDesc = humidity >= 80 ? " and very humid" : humidity >= 60 ? " with moderate humidity" : "";
+      return `It is currently ${temp} degrees${humidDesc} around you, which feels ${feel}. ${humidity >= 85 ? "It may feel uncomfortable — stay hydrated." : ""}`.trim();
+    } catch (err) {
+      log.error("Weather query handler error:", err.message);
+      return "I had trouble reading the sensor data right now.";
+    }
+  }
+
+  // Cancel -> Acknowledge and stop
+  if (intentStr === "cancel") {
+    return "Okay, cancelled.";
   }
 
   // Emergency SOS Trigger

@@ -5,7 +5,8 @@ const scheduleAddPrompt = new PromptTemplate({
     "inputText",
     "intent",
     "chatHistory",
-    "userData"
+    "userData",
+    "currentTime"
   ],
 
   template: `
@@ -55,6 +56,22 @@ class
 task
 schedule
 event
+
+=====================
+CURRENT DATE & TIME
+=====================
+
+The current date and time in IST is:
+{currentTime}
+
+Use this to resolve relative time expressions:
+- "tomorrow" = next calendar day from the above date
+- "tonight" = today's date at ~9 PM IST
+- "next Monday" = the upcoming Monday from the above date
+- "in 30 minutes" = currentTime + 30 minutes
+- "at 6 PM" = today's date at 18:00 IST
+
+Always produce time_event as a valid ISO 8601 date string (e.g. 2026-08-02T18:00:00+05:30).
 
 =====================
 EXTRACTION RULES

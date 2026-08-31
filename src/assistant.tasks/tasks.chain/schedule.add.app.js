@@ -28,11 +28,19 @@ export default async function scheduleAddApp(text, intent){
 
   try{
 
+    // Compute current time in IST for relative time resolution
+    const currentTime = new Date().toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      dateStyle: "full",
+      timeStyle: "medium"
+    });
+
     const result = await scheduleChain.invoke({
       inputText: text,
       intent: intent.intent,
       chatHistory: chatHistory.chats,
-      userData: userData
+      userData: userData,
+      currentTime: currentTime
     });
 
     if(!result.content){

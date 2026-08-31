@@ -82,6 +82,17 @@ If a finance transaction exists extract:
 type → "debit" or "credit"  
 description → short clean description  
 amount → number only  
+category → one of: food | transport | shopping | health | education | entertainment | utilities | other
+
+Category detection rules:
+- food: restaurant, lunch, dinner, snack, groceries, chai, coffee, swiggy, zomato, meal
+- transport: uber, ola, auto, bus, train, metro, fuel, petrol, cab, ticket
+- shopping: clothes, shoes, amazon, flipkart, mall, item, product, store
+- health: medicine, doctor, hospital, pharmacy, chemist, clinic, gym
+- education: course, book, fee, tuition, college, school, udemy, exam
+- entertainment: movie, netflix, game, concert, show, spotify, youtube premium
+- utilities: electricity, water, wifi, internet, recharge, phone, gas, rent
+- other: anything that doesn't fit above
 
 Examples:
 
@@ -90,7 +101,8 @@ Examples:
 {{
 "type": "debit",
 "description": "food",
-"amount": 200
+"amount": 200,
+"category": "food"
 }}
 
 "I received 5000 salary"
@@ -98,7 +110,8 @@ Examples:
 {{
 "type": "credit",
 "description": "salary",
-"amount": 5000
+"amount": 5000,
+"category": "other"
 }}
 
 If no finance transaction exists:
@@ -133,7 +146,8 @@ OUTPUT FORMAT
 "finance": {{
 "type": "debit | credit",
 "description": "string",
-"amount": number
+"amount": number,
+"category": "food | transport | shopping | health | education | entertainment | utilities | other"
 }}
 or null
 }}

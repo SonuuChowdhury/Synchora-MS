@@ -26,6 +26,16 @@ const keywordMap = {
     "remind", "schedule", "appointment", "meeting", "calendar", "alarm", "tomorrow", "task", "todo",
     "याद", "कल", "समय", "मीटिंग",
     "yaad", "kal", "samay", "meeting"
+  ],
+  weather: [
+    "temperature", "weather", "humidity", "hot", "cold", "warm", "rain", "rainy",
+    "तापमान", "मौसम", "गर्मी", "सर्दी", "बारिश",
+    "tapman", "mausam", "garmi", "sardi", "barish"
+  ],
+  cancel: [
+    "stop", "cancel", "never mind", "nevermind", "quiet", "shut up",
+    "रुको", "बंद करो", "रहने दो",
+    "ruko", "band karo", "rehne do"
   ]
 };
 

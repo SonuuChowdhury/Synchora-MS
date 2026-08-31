@@ -257,6 +257,22 @@ Always examine **recentChats** and **searchHistory** before deciding.
 
 --------------------------------------------------
 
+MANDATORY SEARCH RULE
+
+If the searchHistory field says "No search history available." OR is empty:
+
+You MUST return:
+
+"found": false
+
+You are NOT allowed to answer from your own training knowledge.
+
+The answer MUST come from actual web search results.
+
+This rule cannot be overridden.
+
+--------------------------------------------------
+
 2. Check whether the answer already exists in searchHistory.
 
 Return "found": true if:

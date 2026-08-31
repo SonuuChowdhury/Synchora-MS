@@ -18,16 +18,6 @@ async function thinkNode(state) {
   log.info("Analyzing search history and context...");
 
   try {
-    if (!state.isUserChatSaved) {
-      await SaveChat({
-        role: "user",
-        message: state.userQuery,
-        intent: state.intent,
-        confidence: state.confidence,
-      });
-      state.isUserChatSaved = true;
-    }
-
     const history = await redisClient.get(SEARCH_CACHE_KEY);
     const recentChatsDoc = await GetChatHistory();
     const recentChats = recentChatsDoc?.chats || recentChatsDoc || [];
@@ -124,7 +114,22 @@ async function thinkNode(state) {
 // ---------------- SEARCH NODE (SERP API + DUCKDUCKGO FALLBACK) ----------------
 
 async function searchNode(state) {
-  log.info(`Executing web search step ${state.searchCount}/${MAX_RESEARCH_STEPS}`);
+  // Save user chat message on the very first search iteration
+  if (!state.isUserChatSaved) {
+    try {
+      await SaveChat({
+        role: "user",
+        message: state.userQuery,
+        intent: state.intent,
+        confidence: state.confidence,
+      });
+    } catch (e) {
+      log.warn("Failed to save user chat in searchNode:", e.message);
+    }
+  }
+
+  const stepNum = (state.searchCount || 0) + 1;
+  log.info(`Executing web search step ${stepNum}/${MAX_RESEARCH_STEPS}`);
   let results = null;
 
   // Tier 1: SerpAPI
@@ -170,6 +175,8 @@ async function searchNode(state) {
   return {
     ...state,
     searchResults: results,
+    searchCount: stepNum,
+    isUserChatSaved: true,
   };
 }
 
@@ -200,19 +207,21 @@ const graph = new StateGraph({
     intent: "string",
     confidence: "number",
     isUserChatSaved: "boolean",
+    mustSearch: "boolean",
   },
 });
 
 graph.addNode("think", thinkNode);
 graph.addNode("search", searchNode);
 
-graph.setEntryPoint("think");
+// Entry point: always start with a forced search on fresh queries
+graph.setEntryPoint("search");
+
+graph.addEdge("search", "think");
 
 graph.addConditionalEdges("think", decisionNode, {
   search: "search",
   [END]: END,
 });
-
-graph.addEdge("search", "think");
 
 export const researchAgent = graph.compile();

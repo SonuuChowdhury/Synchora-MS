@@ -20,6 +20,10 @@ export const fillersEnglish = {
     "Sure, one moment.",
     "Checking your calendar."
   ],
+  weather: [
+    "Checking sensors.",
+    "One moment, reading sensors."
+  ],
   chat: [
     "Hmm.",
     "Yes.",
@@ -61,7 +65,7 @@ export const fillersHindi = {
 };
 
 export function getRandomFiller(intent = "default", text = "") {
-  if (intent === "none" || !intent) return null;
+  if (intent === "none" || intent === "cancel" || !intent) return null;
   const isHindi = /[\u0900-\u097F]/.test(text) || /(kya|kaun|kab|kahan|kyun|kaise|batao|dhundho|paisa|kharcha)/i.test(text);
   const poolSource = isHindi ? fillersHindi : fillersEnglish;
   const pool = poolSource[intent] ?? poolSource.default;

@@ -6,6 +6,7 @@ import GetChatHistory from "../../db.tasks/chat.get.app.js";
 import GetUser from "../../db.tasks/user.get.app.js";
 import SaveChat from "../../db.tasks/chat.save.app.js";
 import SaveUser from "../../db.tasks/user.save.app.js";
+import GetLatestTelemetry from "../../db.tasks/telemetry.data.get.js";
 import createLogger from "../../utils/logger.js";
 import fs from "fs";
 import path from "path";
@@ -52,20 +53,27 @@ export default async function processVoicePipeline(text, isTelegramClient = fals
     const startTime = Date.now();
     log.info(`Processing input: "${text}"`);
 
-    // Parallel DB fetching
-    const [userData, chatHistoryDoc] = await Promise.all([
+    // Parallel DB fetching (including latest telemetry for sensor-aware responses)
+    const [userData, chatHistoryDoc, telemetry] = await Promise.all([
       GetUser(),
-      GetChatHistory()
+      GetChatHistory(),
+      GetLatestTelemetry()
     ]);
 
     const chatHistory = chatHistoryDoc?.chats || chatHistoryDoc || [];
+
+    // Build sensor data context string for the prompt
+    const sensorData = telemetry
+      ? `Temperature: ${telemetry.temperature}°C, Humidity: ${telemetry.humidity}%, Location: lat=${telemetry.location?.coordinates?.[1] ?? 0} lng=${telemetry.location?.coordinates?.[0] ?? 0}, Last updated: ${new Date(telemetry.time).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}`
+      : "Sensor data unavailable.";
 
     // Unified single-pass Gemini call
     const result = await unifiedChain.invoke({
       inputText: text,
       chatHistory: JSON.stringify(chatHistory.slice(-8)),
       userData: JSON.stringify(userData || {}),
-      modelData: JSON.stringify(modelData)
+      modelData: JSON.stringify(modelData),
+      sensorData: sensorData
     });
 
     const clean = cleanAndExtractJson(result);

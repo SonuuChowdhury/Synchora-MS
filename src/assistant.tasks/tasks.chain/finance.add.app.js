@@ -62,7 +62,8 @@ export default async function financeAddApp(text, intent){
       await FinanceMemory.create({
         type: parsed.finance.type,
         description: parsed.finance.description,
-        amount: parsed.finance.amount
+        amount: parsed.finance.amount,
+        category: parsed.finance.category || "other"
       });
 
     }

@@ -8,11 +8,12 @@ import chalk from "chalk";
 import boxen from "boxen";
 
 import { errorHandler } from "./src/middlewares/error.middleware.js";
-import { listen } from "./listen.js";
+import { listen, runTTS, getActiveSocket } from "./listen.js";
 import router from "./src/routes/routes.js";
 import connectDB from "./src/db/mongoose.connect.db.js";
 import './src/bot/telegram.bot.js';
 import redisClient from "./src/config/redis.config.js";
+import { startReminderService } from "./src/services/reminder.service.js";
 
 import createLogger from "./src/utils/logger.js";
 
@@ -85,5 +86,10 @@ server.listen(PORT, async () => {
 
   listen(server);
   log.info("WebSocket listener service started");
+
+  // Start proactive reminder service (polls every 60s for upcoming events)
+  startReminderService(runTTS, getActiveSocket);
+  log.info("Reminder service started");
+
   log.info(`Server running at http://localhost:${PORT}`);
 });
